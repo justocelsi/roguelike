@@ -1,26 +1,28 @@
 @import "tailwindcss";
 
 /*
- * Paleta monocroma. La atmósfera sale del ritmo y del texto, no del color.
- * Un solo acento frío para lo que sale mal.
+ * Oscuro con verde agua. Híbrido pixel / brutalista: bloques planos,
+ * tipografía grande, cero degradés.
  */
 :root {
-  --background: #0b0b0c;
-  --foreground: #d8d4cc;
-  --dim: #6a665f;
-  --dimmer: #3a3733;
-  --malo: #b4685a;
-  --bueno: #8fa07a;
-  --sueno: #8b8397;
+  --background: #05100e;
+  --foreground: #cfe3de;
+  --agua: #3fd9c4;
+  --agua-hondo: #1c6b60;
+  --dim: #4a625d;
+  --dimmer: #162724;
+  --malo: #e2685c;
+  --sueno: #9a86c4;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-agua: var(--agua);
+  --color-agua-hondo: var(--agua-hondo);
   --color-dim: var(--dim);
   --color-dimmer: var(--dimmer);
   --color-malo: var(--malo);
-  --color-bueno: var(--bueno);
   --color-sueno: var(--sueno);
   --font-mono: var(--font-geist-mono);
 }
@@ -33,6 +35,36 @@ body {
 }
 
 ::selection {
-  background: var(--foreground);
+  background: var(--agua);
   color: var(--background);
+}
+
+/* Latido lento del sprite: nada de animación de personaje, sólo presencia. */
+@keyframes respirar {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+.respira {
+  animation: respirar 2.8s ease-in-out infinite;
+}
+
+@keyframes sacudir {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-3px);
+  }
+  75% {
+    transform: translateX(3px);
+  }
+}
+.sacude {
+  animation: sacudir 0.18s linear 2;
 }

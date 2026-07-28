@@ -1,175 +1,199 @@
 # VIGILIA
 
-> Un roguelike donde el mundo se reescribe mientras dormís, vos elegís cómo, y sos el único que recuerda la versión anterior.
+> Un roguelike de terror onírico. Sos un estudiante, las aulas son pesadillas,
+> y cada vez que dormís elegís un poder y aceptás el defecto que viene con él.
+
+---
 
 ## Origen
 
-Inspirado en la ciencia ficción de ideas: *Solaris* (Lem), *La rueda celeste* (Le Guin), *Soy leyenda* (Matheson), *Fundación* y *Yo, Robot* (Asimov). El hilo común de esos cinco libros no es el espacio ni la tecnología: es que **el problema del protagonista es epistemológico**. No es "cómo lo mato", es "qué está pasando realmente".
+**Ciencia ficción de ideas**: *Solaris* (Lem), *La rueda celeste* (Le Guin),
+*Soy leyenda* (Matheson), *Fundación* y *Yo, Robot* (Asimov). De ahí viene que
+lo que se corrompe no sean tus stats sino **lo que creías saber**.
 
-De ahí sale el hook: **el recurso escaso es la certeza, y el enemigo es tu propio modelo equivocado del mundo.**
+**NO-SKIN** (No-Eye Soft): el formato de elegir entre salas con probabilidades
+declaradas, el combate por turnos donde cada acción consume un turno, y el
+minimalismo de terror.
 
-Referencia de formato y tono: **NO-SKIN** (No-Eye Soft) — roguelike de terror minimalista, ubicaciones con probabilidades declaradas, por turnos, atmósfera por escritura y no por animación.
-
-**Lo que nos diferencia de NO-SKIN:** ahí las reglas del juego son fijas. Acá el jugador va reescribiendo el reglamento y el mundo se acomoda hacia atrás. Al final de una run estás jugando a algo que no existía cuando empezaste. Esa es la idea original y hay que protegerla en cada decisión de diseño.
-
----
-
-## El ciclo
-
-1. **Despierto.** Se te presentan **tres o más salas**. Cada sala muestra sus *lecturas*: los **3 o 4 eventos posibles** que pueden ocurrir ahí, cada uno con su probabilidad declarada. Elegís una sala, se sortea el evento, y entrás.
-2. **Adentro de la sala hay decisiones** (ver abajo). Cada acción consume Vigilia.
-3. **A medida que la Vigilia baja, la interfaz se degrada.** Los porcentajes pasan de `40%` a `~40%` a `4?%` a `??`. El cansancio no te pega más fuerte: te hace *saber menos*.
-4. **Dormís.** El sueño te ofrece **tres distorsiones**. Elegís una.
-5. **Despertás en un mundo reescrito**, retroactivamente. Las salas que conocías ahora son otras. Los números que memorizaste ya no valen. El juego mantiene **tu anotación vieja tachada al lado de la nueva**: sos el único que recuerda.
-6. Repetir. Morir → permadeath → mundo nuevo.
-
-## La tensión central
-
-Una sola decisión, todos los ciclos, y es con la que el jugador se va a pelear:
-
-- **Dormís temprano** → *elegís* entre tres distorsiones, pero exploraste poco y estás mal equipado.
-- **Aguantás hasta desplomarte** → exploraste todo el ciclo, pero **la distorsión la elige la pesadilla**, y las suyas son peores y más raras.
-
-**La agencia sobre la distorsión es, en sí misma, el recurso.**
+**Shadow Slave** (Guiltythree): ascender exige aceptar un **Defecto**
+permanente. El poder no se gana, se compra, y el precio te lo bancás el resto
+de la run.
 
 ---
 
-## Adentro de la sala
+## El bucle
 
-Tres verbos:
+1. **Se te ofrecen 3 aulas.** Cada una es una materia, con su tabla de
+   eventos y sus probabilidades declaradas. Lo único incierto del juego es
+   **qué vas a encontrar antes de entrar**.
+2. **Entrás con la vida llena.** Adentro no hay información oculta: ves al
+   enemigo, ves sus intenciones, ves tus opciones.
+3. **Combate por turnos.** Cada acción consume un turno, incluidas usar un
+   item y usar el arma.
+4. **Ganás XP.** Al subir de nivel elegís qué atributo subir.
+5. Después de **6 aulas** se termina el ciclo y **dormís**.
+6. **El sueño es un lugar**, no un menú: un mini-dungeon corto que se recorre,
+   y al fondo está la oferta de **poder + defecto**.
+7. Despertás. El colegio se deformó un escalón más. Repetís.
+8. **La muerte es permanente.**
 
-- **Observar** — gastás Vigilia y ganás información: revela el evento real, o una lectura oculta, o qué pasaría si usaras otro verbo.
-- **Actuar** — el verbo propio del evento (tomar / forzar / hablar / desactivar). Resuelve la sala.
-- **Retirarte** — salís con las manos vacías. Siempre disponible, siempre gratis.
+**5 ciclos** por run. Todos los números son de arranque y se afinan jugando.
 
-### La regla que lo convierte en juego
+### Qué es lo escaso
 
-**Cada acción adentro consume Vigilia. Y la Vigilia es al mismo tiempo tu vida, tu reloj y tu claridad.**
+Nada se acumula entre aulas: la vida vuelve al máximo al entrar. Eso quiere
+decir que **cada combate es un desafío letal autocontenido** — morís adentro de
+una pelea o no morís. La dificultad tiene que salir del combate en sí, nunca
+del desgaste.
 
-Todo el juego en una frase: **comprás certeza con vida.** Observar es seguro pero te empuja hacia la pesadilla. Actuar a ciegas es barato, pero podés estar aplicando el verbo equivocado a algo que no era lo que creías.
+La decisión al elegir aula no es "cuánta vida me queda" sino **qué atributo
+expongo**, porque cada materia lastima de una manera distinta.
 
-"La certeza es el recurso escaso" no es una idea del documento: es el sistema económico del juego.
+---
 
-### El evento madura
+## Atributos
 
-Si te quedás demasiado, **el evento cambia**. Lo que era una sala aprovechable se vuelve otra cosa. Observar tiene entonces dos costos: la Vigilia, y que aquello que mirás deje de ser lo que estabas mirando.
+Tres, y una sola barra de vida.
 
-Eso da un reloj *adentro* de la sala, no sólo afuera. Y evita que "observar siempre" sea la estrategia dominante.
+| Atributo | Potencia el verbo | Resiste el efecto |
+|---|---|---|
+| **Conocimiento** | RESOLVER | Confusión |
+| **Nervio** | AGUANTAR | Miedo |
+| **Reflejos** | ESQUIVAR | Torpeza |
+
+Los atributos **no son barras**: son stats. La vida es una sola y morís cuando
+llega a cero.
+
+### Los tres efectos
+
+No son números, son **reglas que cambian mientras dure el estado**:
+
+- **Confusión** — los textos y los números de la interfaz se muestran mal.
+- **Miedo** — tu acción puede fallar directamente.
+- **Torpeza** — el enemigo actúa dos veces por turno tuyo.
 
 ---
 
 ## Combate
 
-Mínimo, por turnos, y **no es un sistema aparte: son los mismos tres verbos con el reloj acelerado.**
+Por turnos. **Toda acción consume un turno**, incluidas item y arma.
 
-| Fuera de combate | En combate |
+| Acción | Qué hace |
 |---|---|
-| Observar | Esperar / cubrirte |
-| Actuar | Golpear |
-| Retirarte | Huir |
+| **RESOLVER** | Ataque basado en Conocimiento |
+| **AGUANTAR** | Reduce el daño de este turno, basado en Nervio |
+| **ESQUIVAR** | Evita el ataque y contraatacás, basado en Reflejos |
+| **ARMA** | Usa el arma equipada |
+| **ITEM** | Usa un consumible |
+| **PODER** | Habilidad ganada en un sueño, usos limitados |
+| **HUIR** | Salís vivo, perdés la recompensa del aula |
 
-- **No hay barra de vida enemiga.** Feedback cualitativo: *"se mueve más lento"*, *"algo cede"*. Nunca sabés cuánto le falta.
-- **El daño se descuenta de Vigilia.** Un solo recurso en todo el juego. Que te peguen es perder claridad y reloj a la vez. Una pelea mala te come el ciclo y te empuja a dormir antes de lo que querías — devolviéndote a la tensión central. Todo cierra sobre el mismo bucle, sin economías paralelas.
-- **La criatura tiene un patrón oculto** de 2 o 3 intenciones y **telegrafía** la próxima con una línea de texto (*tell*). Responder bien depende de leer el tell.
-- Duración: **2 a 4 turnos**.
-- No todo evento hostil abre combate. Algunos siguen siendo "el verbo equivocado te mata".
-
-### Meta-progresión
-
-**No se desbloquea nada entre runs. La meta-progresión es el conocimiento del jugador**: aprender qué significa cada tell, qué hace cada tipo de evento, qué esconde cada distorsión. Como Spelunky o Dark Souls.
-
-Y encima es el tema del juego: la partida se gana sabiendo, y las distorsiones existen para arruinar lo que creías saber.
+- Cada enemigo tiene una **debilidad**: hay un verbo que le funciona mejor que
+  los otros, y descubrirlo es el juego.
+- Cada enemigo **telegrafía su intención** un turno antes.
+- La vida del enemigo **se ve**.
 
 ---
 
-## Las distorsiones
+## Las 6 materias
 
-Dos categorías. La intensidad determina si se acumula o si reemplaza.
+Cada materia define sus enemigos, su arma y **qué atributo lastima**. Ese
+vínculo es una regla generativa, no ambientación: si la sala es Matemática, la
+regla es un arma y el enemigo es un teorema.
 
-### Chicas — acumulables
+| Materia | Ataca | Efecto | Enemigos | Arma |
+|---|---|---|---|---|
+| **Matemática** | Conocimiento | Confusión | el teorema que no cierra, la demostración circular | la regla, el compás |
+| **Literatura** | Conocimiento | Confusión | el libro que no termina, el narrador | el diccionario |
+| **Historia** | Nervio | Miedo | algo que ya pasó y vuelve, la fecha | el puntero, el mapa |
+| **Biología** | Nervio | Miedo | el esqueleto del aula, lo que está en formol | el bisturí |
+| **Química** | Reflejos | Torpeza | algo que reacciona, la campana de gases | el mechero, el ácido |
+| **Ed. Física** | Reflejos | Torpeza | el que elige último, la soga | la pelota, el silbato |
 
-Ajustan parámetros. Son el tejido, no el evento.
-
-- Observar cuesta 1 menos de Vigilia
-- Una lectura de cada sala viene revelada de entrada
-- Retirarte devuelve algo de Vigilia
-- Los eventos maduran más lento
-
-### Grandes — excluyentes, sólo una activa por vez
-
-Cambian una **regla del motor**. Elegir una nueva significa **perder la anterior**.
-
-| Distorsión | Efecto |
-|---|---|
-| **Los números mienten** | Las probabilidades declaradas tienen un error desconocido |
-| **Silencio** | No ves los eventos posibles, sólo la sala |
-| **Lucidez** | Ves el evento real antes de entrar, pero sólo podés hacer *una* acción adentro |
-| **El eco** | Al entrar repetís automáticamente tu última acción del ciclo anterior |
-
-Las cuatro grandes atacan **tu capacidad de saber**, no tus stats. Ahí viven Lem y Asimov.
-
-**Nota sobre la regla de oro:** "cambia una regla, no un número" aplica **sólo a las grandes**. Las chicas son numéricas a propósito — es lo que evita que cada elección al dormir dé vuelta la mesa.
+Dos materias por atributo: siempre hay una alternativa, pero nunca una salida
+gratis.
 
 ---
 
-## Ambientación: sin lugar
+## La deformación
 
-> **Abierto:** la variante de **sala de control / estación de observación** sigue en juego. Puede convivir con lo abstracto: una consola concreta desde la cual observás un lugar que no lo es. Decidir.
+El colegio arranca **reconocible** y se corrompe progresivamente, un escalón
+por ciclo:
 
-No se aclara nunca dónde estás. Pero **el lugar no tiene nombre, tiene gramática**: las salas se generan por composición, no se escriben a mano.
+1. **Cambian los enemigos.** El aula sigue siendo Matemática, pero lo que
+   aparece adentro es cada vez menos matemático.
+2. **Cambia el nombre.** La materia pasa a llamarse otra cosa, con el nombre
+   viejo tachado al lado. Sos el único que recuerda cómo se llamaba.
+3. **Cambian las reglas.** Matemática deja de atacar Conocimiento y empieza a
+   atacar Nervio. Lo que aprendiste sobre esa materia se vuelve falso.
 
-```
-[cualidad] + [forma] + [lectura]
-→ "Una sala donde el aire pesa"
-→ "Un pasillo que ya recorriste (¿lo recorriste?)"
-→ "Algo con una puerta de más"
-```
+El paso 3 es donde sobrevive el hilo epistemológico original: el castigo no es
+que te peguen más fuerte, es que **tu modelo del mundo deje de servir**.
 
-Ventajas:
-- Contenido infinito sin escribir un guión.
-- **Es mecánicamente necesario:** *Silencio* sólo funciona si los nombres eran arbitrarios desde el principio. En una casa concreta, la cocina no puede dejar de ser la cocina.
+---
 
-**El ancla emocional no es el lugar: son las notas del jugador.** El juego registra lo que fue descubriendo, y las distorsiones invalidan ese registro. Lo que se pierde cuando el mundo se reescribe no es un hogar: es el propio mapa mental.
+## Poder y Defecto
+
+Al fondo del sueño hay una oferta. **Ves el precio antes de aceptar.**
+
+- El **poder** y el **defecto** se sortean por separado, así que 6 poderes × 6
+  defectos son 36 ofertas distintas con la mitad del contenido escrito.
+- Los **defectos se acumulan** durante toda la run. Son permanentes.
+- Se implementan como **interceptores** sobre el motor, no como `if`s: cada
+  punto donde el juego decide algo consulta la lista activa. Agregar uno nuevo
+  es agregar un objeto a un catálogo.
+
+---
+
+## Items
+
+- **Un arma equipada.** Sale de la materia donde la conseguiste.
+- **Consumibles**, pocos y con espacio limitado.
+- **Sombras**: lo que derrotás se te queda. Como es algo que ya entendiste, se
+  gasta en saber — revelar, anular un efecto. Un uso cada una.
+- Todo se pierde al morir.
+
+---
+
+## Progresión entre runs
+
+El nivel y los atributos **se reinician**. Lo que queda desbloqueado son
+materias, items y poderes que pueden aparecer en runs futuras.
+
+---
 
 ## Estética
 
-Minimalista. Monocromo o duotono, tipografía fuerte, texto corto y bien escrito, cero animación. La atmósfera sale del ritmo y de la escritura. Tailwind hace esto perfecto y no necesitamos ni un asset.
+**Oscuro con verde agua.** Híbrido entre pixel art y brutalismo: sprites y
+barras de vida, pero con tipografía grande y bloques planos en vez de
+ventanitas de JRPG.
+
+**Tono: terror onírico.** Serio, inquietante, sin guiños ni chistes. El colegio
+como pesadilla, no como parodia.
 
 ---
 
-## Preguntas abiertas
+## Decisiones tomadas por default
 
-1. ~~¿Hay combate?~~ → **Sí, mínimo por turnos, mismos verbos.**
-2. ~~¿Cómo es la sala una vez que entrás?~~ → **Tres verbos, Vigilia como costo, el evento madura.**
-3. ~~Las distorsiones bajo el principio acumulables/excluyentes~~ → **Resuelto. Falta ampliar el pool.**
-4. **Ambientación**: abstracto puro, o sala de control observando algo abstracto.
-5. **¿Las probabilidades declaradas son honestas?** Parcialmente respondido por *Los números mienten*, pero falta definir si son honestas por defecto o si hay algo más de fondo.
-6. **Números concretos**: Vigilia inicial, costo de cada verbo, daño, cuántos ciclos dura una run. Se define jugando.
+Marcadas para poder vetarlas:
+
+- 6 aulas por ciclo, 5 ciclos por run
+- Se puede huir, perdiendo la recompensa del aula
+- La vida del enemigo se ve en números
+- Estás solo: sin compañeros ni profesores como personajes
+- El estudiante no sabe que está soñando; lo descubre el jugador
+- La misma materia puede repetirse en una misma oferta
+
+## Sin decidir
+
+- **¿Se puede morir dentro del sueño?** Por ahora no: el sueño es sólo el
+  lugar donde se altera la realidad. Queda para más adelante.
+- El catálogo concreto de poderes y defectos
+- Qué hace exactamente el arma frente a los tres verbos de atributo
+- Si hay jefes, y si los parciales o finales lo son
 
 ---
-
-## Alcance
-
-### MVP — mínimo jugable, sin backend
-
-- [ ] Generación procedural de salas por composición
-- [ ] 3+ salas por elección, cada una con 3-4 eventos y probabilidades declaradas
-- [ ] Los tres verbos + Vigilia + maduración del evento
-- [ ] Degradación progresiva de la interfaz según Vigilia
-- [ ] Combate mínimo: 2 criaturas, tells, daño a Vigilia
-- [ ] Dormir → elegir 1 de 3 → distorsiones (chicas + grandes)
-- [ ] 3 ciclos, muerte, reinicio
-- [ ] Deploy en Vercel
-
-Sin cuentas, sin base de datos, sin guardado.
-
-### Después del MVP
-
-- Ampliar el pool de distorsiones (cada una nueva multiplica las combinaciones)
-- Semilla diaria compartida, tipo Wordle, con resultado compartible
-- Supabase: leaderboard y estadísticas de qué distorsiones elige la gente
-- **Norte de diseño a largo plazo:** que la condición de victoria sea *recordar* — reconstruir correctamente cómo era el mundo antes de la primera distorsión. La memoria como win condition, no como decorado.
 
 ## Stack
 
-TypeScript · Next.js 16 (App Router) · React 19 · Tailwind v4 · Vercel · Supabase (post-MVP)
+TypeScript · Next.js 16 (App Router) · React 19 · Tailwind v4 · Vercel

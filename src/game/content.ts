@@ -1,146 +1,339 @@
 /**
- * El contenido del juego: la gramática con la que se generan las salas y el
- * catálogo de eventos.
+ * El contenido: las 6 materias y todo lo que cuelga de ellas.
  *
- * Las salas no se escriben a mano, se componen. El lugar no tiene nombre pero
- * tiene gramática — eso da contenido infinito y además es lo que permite que
- * una distorsión les saque el nombre sin que se rompa nada.
+ * El vínculo materia → enemigos → arma → atributo lastimado es una regla
+ * generativa, no ambientación. Si el aula es Matemática, la regla es un arma y
+ * el enemigo es un teorema. Eso le da al jugador un modelo mental que puede
+ * usar para elegir, y le da al juego contenido coherente sin escribir un guión.
+ *
+ * Tono: terror onírico. Serio, sin guiños.
  */
 
-import type { GameEvent, Reading, Room } from "./types";
-import { pick, pickMany, pickWeighted, randInt, random, type Rng } from "./rng";
+import type { Arma, Enemigo, Item, Materia } from "./types";
 
-const FORMAS = [
-  "Una sala",
-  "Un cuarto",
-  "Un pasillo",
-  "Una antesala",
-  "Un hueco",
-  "Algo parecido a una sala",
-  "Un espacio",
-] as const;
-
-const CUALIDADES = [
-  "donde el aire pesa",
-  "sin esquinas",
-  "que huele a metal frío",
-  "demasiado alta",
-  "que no estaba acá",
-  "con una puerta de más",
-  "donde el sonido llega tarde",
-  "que alguien acaba de dejar",
-  "más chica por dentro",
-  "que ya recorriste",
-  "en la que la luz no llega al piso",
-  "sin polvo",
-] as const;
-
-export const EVENTS: Record<string, GameEvent> = {
-  hallazgo: {
-    id: "hallazgo",
-    label: "algo aprovechable",
-    reveal: "Es comida. Fue comida. Todavía sirve.",
-    actVerb: "Tomar",
-    blind: { vigilia: +2, text: "Tomás sin mirar. Algo sirve. No todo." },
-    informed: { vigilia: +5, text: "Sabías qué agarrar. Te repone." },
-    maturesTo: "nada",
+export const MATERIAS: Record<string, Materia> = {
+  matematica: {
+    id: "matematica",
+    nombre: "Matemática",
+    atributo: "conocimiento",
+    efecto: "confusion",
+    enemigos: ["teorema", "demostracion", "problema"],
+    armas: ["regla", "compas"],
   },
-  resto: {
-    id: "resto",
-    label: "restos de alguien",
-    reveal: "Estuvo acá mucho tiempo. Tiene las manos cerradas.",
-    actVerb: "Registrar",
-    blind: { vigilia: +1, text: "Le abrís las manos. Había algo. Casi nada." },
-    informed: { vigilia: +4, text: "Sabías dónde buscar. Estaba ahí." },
-    maturesTo: "presencia",
+  literatura: {
+    id: "literatura",
+    nombre: "Literatura",
+    atributo: "conocimiento",
+    efecto: "confusion",
+    enemigos: ["libro", "narrador"],
+    armas: ["diccionario"],
   },
-  nada: {
-    id: "nada",
-    label: "nada",
-    reveal: "Nada. Realmente nada. Es lo más raro que viste hoy.",
-    actVerb: "Insistir",
-    blind: { vigilia: -3, text: "Insistís un rato largo. No había nada." },
-    informed: { vigilia: -1, text: "Ya sabías. Igual mirás. Igual nada." },
+  historia: {
+    id: "historia",
+    nombre: "Historia",
+    atributo: "nervio",
+    efecto: "miedo",
+    enemigos: ["vuelve", "fecha"],
+    armas: ["puntero"],
   },
-  eco: {
-    id: "eco",
-    label: "un sonido que se repite",
-    reveal: "Es tu propio paso, llegando tarde. Bastante tarde.",
-    actVerb: "Escuchar",
-    blind: {
-      vigilia: -2,
-      text: "Escuchás sin entender. Te quedás más tiempo del que querías.",
-    },
-    informed: {
-      vigilia: +2,
-      text: "Contás el desfasaje. Sabés cuánto tarda el lugar en devolverte.",
-    },
-    maturesTo: "presencia",
+  biologia: {
+    id: "biologia",
+    nombre: "Biología",
+    atributo: "nervio",
+    efecto: "miedo",
+    enemigos: ["esqueleto", "formol"],
+    armas: ["bisturi"],
   },
-  espejo: {
-    id: "espejo",
-    label: "vos",
-    reveal: "Sos vos, desfasado. Hace lo que hiciste hace un rato.",
-    actVerb: "Mirar",
-    blind: {
-      vigilia: -4,
-      text: "Lo mirás demasiado. Te devuelve algo que no hiciste todavía.",
-    },
-    informed: {
-      vigilia: +1,
-      text: "Lo mirás sabiendo qué es. Se aburre antes que vos.",
-    },
+  quimica: {
+    id: "quimica",
+    nombre: "Química",
+    atributo: "reflejos",
+    efecto: "torpeza",
+    enemigos: ["reaccion", "campana"],
+    armas: ["mechero", "acido"],
   },
-  presencia: {
-    id: "presencia",
-    label: "algo que respira",
-    reveal: "Respira lento. Está esperando que te decidas.",
-    actVerb: "Enfrentar",
-    hostile: true,
-    blind: {
-      vigilia: -7,
-      text: "Te movés primero, sin saber contra qué. Sale mal.",
-    },
-    informed: {
-      vigilia: -2,
-      text: "Sabías dónde estaba. Salís con lo puesto, pero salís.",
-    },
+  fisica: {
+    id: "fisica",
+    nombre: "Educación Física",
+    atributo: "reflejos",
+    efecto: "torpeza",
+    enemigos: ["ultimo", "soga"],
+    armas: ["pelota"],
   },
 };
 
-/** Eventos que pueden aparecer en la oferta de una sala. */
-const OFERTABLES = Object.keys(EVENTS);
+/** Cómo se llama cada materia a medida que se deforma. Índice = deformación. */
+export const NOMBRES_DEFORMADOS: Record<string, string[]> = {
+  matematica: ["Matemática", "Cálculo", "Contar", "Lo que no cierra"],
+  literatura: ["Literatura", "Lengua", "Leer", "Lo que sigue escribiéndose"],
+  historia: ["Historia", "Cívica", "Antes", "Lo que vuelve"],
+  biologia: ["Biología", "Naturales", "Cuerpos", "Lo que había adentro"],
+  quimica: ["Química", "Fisicoquímica", "Mezclas", "Lo que no se separa"],
+  fisica: ["Educación Física", "Gimnasia", "Correr", "Lo que te alcanza"],
+};
 
-export function generateRoom(rng: Rng, index: number): Room {
-  const forma = pick(rng, FORMAS);
-  const cualidad = pick(rng, CUALIDADES);
-  const n = randInt(rng, 3, 4);
-  const chosen = pickMany(rng, OFERTABLES, n);
+export const ENEMIGOS: Record<string, Enemigo> = {
+  // --- Matemática ---
+  teorema: {
+    id: "teorema",
+    nombre: "un teorema que no cierra",
+    vida: 22,
+    debilidad: "resolver",
+    xp: 10,
+    patron: [
+      { tell: "Empieza a reescribirse.", tipo: "golpe", daño: 6 },
+      {
+        tell: "Se detiene. Falta un paso y no sabés cuál.",
+        tipo: "efecto",
+        efecto: "confusion",
+      },
+      {
+        tell: "Te muestra el resultado antes de la demostración.",
+        tipo: "golpe",
+        daño: 9,
+      },
+    ],
+  },
+  demostracion: {
+    id: "demostracion",
+    nombre: "una demostración circular",
+    vida: 28,
+    debilidad: "aguantar",
+    xp: 12,
+    patron: [
+      { tell: "Vuelve al principio.", tipo: "golpe", daño: 5 },
+      { tell: "Vuelve al principio.", tipo: "golpe", daño: 5 },
+      { tell: "Vuelve al principio. Otra vez.", tipo: "golpe", daño: 11 },
+    ],
+  },
+  problema: {
+    id: "problema",
+    nombre: "un problema sin enunciado",
+    vida: 18,
+    debilidad: "resolver",
+    xp: 9,
+    patron: [
+      {
+        tell: "Espera una respuesta a algo que no preguntó.",
+        tipo: "efecto",
+        efecto: "confusion",
+      },
+      { tell: "Se te acaba el tiempo.", tipo: "golpe", daño: 8 },
+    ],
+  },
 
-  // Pesos crudos, después normalizados a probabilidades declaradas.
-  const raw = chosen.map(() => randInt(rng, 1, 6));
-  const total = raw.reduce((a, b) => a + b, 0);
+  // --- Literatura ---
+  libro: {
+    id: "libro",
+    nombre: "un libro que no termina",
+    vida: 26,
+    debilidad: "resolver",
+    xp: 11,
+    patron: [
+      { tell: "Pasa una página sola.", tipo: "espera" },
+      { tell: "Te nombra.", tipo: "golpe", daño: 10 },
+      {
+        tell: "La página que leíste ya dice otra cosa.",
+        tipo: "efecto",
+        efecto: "confusion",
+      },
+    ],
+  },
+  narrador: {
+    id: "narrador",
+    nombre: "el narrador",
+    vida: 20,
+    debilidad: "aguantar",
+    xp: 12,
+    patron: [
+      {
+        tell: "Describe lo que vas a hacer antes de que lo hagas.",
+        tipo: "golpe",
+        daño: 7,
+      },
+      { tell: "Se corrige.", tipo: "efecto", efecto: "confusion" },
+    ],
+  },
 
-  const readings: Reading[] = chosen.map((eventId, i) => {
-    const p = raw[i] / total;
-    // Por defecto el juego es honesto: lo declarado es lo real.
-    return { eventId, declared: p, actual: p };
-  });
+  // --- Historia ---
+  vuelve: {
+    id: "vuelve",
+    nombre: "algo que ya pasó y vuelve",
+    vida: 24,
+    debilidad: "aguantar",
+    xp: 11,
+    patron: [
+      { tell: "Ya hizo esto.", tipo: "golpe", daño: 7 },
+      { tell: "Lo vas a ver otra vez.", tipo: "efecto", efecto: "miedo" },
+      { tell: "Ya hizo esto y lo va a hacer.", tipo: "golpe", daño: 10 },
+    ],
+  },
+  fecha: {
+    id: "fecha",
+    nombre: "la fecha que no te acordás",
+    vida: 16,
+    debilidad: "resolver",
+    xp: 8,
+    patron: [
+      { tell: "Te mira esperando el número.", tipo: "efecto", efecto: "miedo" },
+      { tell: "Se cansa de esperar.", tipo: "golpe", daño: 9 },
+    ],
+  },
 
-  // El evento se sortea acá, contra las probabilidades *reales*.
-  const rolled = pickWeighted(
-    rng,
-    readings.map((r) => ({ item: r.eventId, weight: r.actual })),
-  );
+  // --- Biología ---
+  esqueleto: {
+    id: "esqueleto",
+    nombre: "el esqueleto del aula",
+    vida: 30,
+    debilidad: "esquivar",
+    xp: 13,
+    patron: [
+      { tell: "Se descuelga del soporte.", tipo: "espera" },
+      { tell: "Se acomoda las manos.", tipo: "golpe", daño: 11 },
+      { tell: "Te muestra dónde te falta algo.", tipo: "efecto", efecto: "miedo" },
+    ],
+  },
+  formol: {
+    id: "formol",
+    nombre: "lo que está en formol",
+    vida: 22,
+    debilidad: "aguantar",
+    xp: 12,
+    patron: [
+      { tell: "Se da vuelta adentro del frasco.", tipo: "efecto", efecto: "miedo" },
+      { tell: "El vidrio cede un poco.", tipo: "golpe", daño: 8 },
+    ],
+  },
 
-  return {
-    id: `sala-${index}-${Math.floor(random(rng) * 1e6)}`,
-    name: `${forma} ${cualidad}`,
-    readings,
-    rolled,
-  };
-}
+  // --- Química ---
+  reaccion: {
+    id: "reaccion",
+    nombre: "algo que reacciona",
+    vida: 20,
+    debilidad: "esquivar",
+    xp: 11,
+    patron: [
+      { tell: "Empieza a burbujear.", tipo: "espera" },
+      { tell: "Se expande.", tipo: "golpe", daño: 12 },
+      { tell: "El aire se pone denso.", tipo: "efecto", efecto: "torpeza" },
+    ],
+  },
+  campana: {
+    id: "campana",
+    nombre: "la campana de gases",
+    vida: 26,
+    debilidad: "aguantar",
+    xp: 12,
+    patron: [
+      { tell: "El extractor se para.", tipo: "efecto", efecto: "torpeza" },
+      { tell: "Se llena.", tipo: "golpe", daño: 9 },
+    ],
+  },
 
-export function generateRooms(rng: Rng, n: number): Room[] {
-  return Array.from({ length: n }, (_, i) => generateRoom(rng, i));
+  // --- Educación Física ---
+  ultimo: {
+    id: "ultimo",
+    nombre: "el que elige último",
+    vida: 24,
+    debilidad: "aguantar",
+    xp: 11,
+    patron: [
+      { tell: "Todavía no dijo tu nombre.", tipo: "efecto", efecto: "torpeza" },
+      { tell: "Sigue sin decirlo.", tipo: "golpe", daño: 8 },
+      { tell: "Señala a otro.", tipo: "golpe", daño: 11 },
+    ],
+  },
+  soga: {
+    id: "soga",
+    nombre: "la soga",
+    vida: 18,
+    debilidad: "esquivar",
+    xp: 9,
+    patron: [
+      { tell: "Se tensa.", tipo: "golpe", daño: 7 },
+      { tell: "Baja hasta donde llegás.", tipo: "efecto", efecto: "torpeza" },
+    ],
+  },
+};
+
+export const ARMAS: Record<string, Arma> = {
+  regla: { id: "regla", nombre: "la regla", daño: 7, texto: "Medís y cortás." },
+  compas: {
+    id: "compas",
+    nombre: "el compás",
+    daño: 10,
+    texto: "La punta entra donde tiene que entrar.",
+  },
+  diccionario: {
+    id: "diccionario",
+    nombre: "el diccionario",
+    daño: 8,
+    texto: "Pesa más de lo que debería.",
+  },
+  puntero: {
+    id: "puntero",
+    nombre: "el puntero",
+    daño: 8,
+    texto: "Señalás y lo que señalás retrocede.",
+  },
+  bisturi: {
+    id: "bisturi",
+    nombre: "el bisturí",
+    daño: 12,
+    texto: "Abrís sin resistencia.",
+  },
+  mechero: {
+    id: "mechero",
+    nombre: "el mechero",
+    daño: 9,
+    texto: "La llama se estira hacia lo que mirás.",
+  },
+  acido: {
+    id: "acido",
+    nombre: "el ácido",
+    daño: 13,
+    texto: "Lo que toca deja de tener forma.",
+  },
+  pelota: {
+    id: "pelota",
+    nombre: "la pelota",
+    daño: 6,
+    texto: "Pega y vuelve a tu mano.",
+  },
+};
+
+export const ITEMS: Record<string, Item> = {
+  agua: {
+    id: "agua",
+    nombre: "la botella",
+    descripcion: "Tomar algo. Recuperás 12.",
+    efecto: { vida: 12 },
+  },
+  apunte: {
+    id: "apunte",
+    nombre: "el apunte de otro",
+    descripcion: "Letra ajena, pero clara. Te saca lo que tengas encima.",
+    efecto: { limpia: true },
+  },
+  caramelo: {
+    id: "caramelo",
+    nombre: "el caramelo del fondo del bolsillo",
+    descripcion: "Poca cosa. Recuperás 6.",
+    efecto: { vida: 6 },
+  },
+  tiza: {
+    id: "tiza",
+    nombre: "la tiza",
+    descripcion: "Se la tirás. 10 de daño.",
+    efecto: { daño: 10 },
+  },
+};
+
+export const MATERIA_IDS = Object.keys(MATERIAS);
+export const ITEM_IDS = Object.keys(ITEMS);
+
+/** Cómo se llama la materia según cuánto se haya deformado. */
+export function nombreMateria(materiaId: string, deformacion: number): string {
+  const nombres = NOMBRES_DEFORMADOS[materiaId];
+  return nombres[Math.min(deformacion, nombres.length - 1)];
 }

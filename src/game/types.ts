@@ -1,134 +1,175 @@
 /** Tipos del motor. Sin React, sin DOM: esto corre en cualquier lado. */
 
-import type { Rng } from "./rng";
+export type Atributo = "conocimiento" | "nervio" | "reflejos";
+export type Efecto = "confusion" | "miedo" | "torpeza";
 
-/** Los tres verbos. Son los mismos dentro y fuera de combate. */
-export type Verb = "observar" | "actuar" | "retirarse";
+/** Las acciones de combate. Toda acción consume un turno. */
+export type Accion =
+  | "resolver"
+  | "aguantar"
+  | "esquivar"
+  | "arma"
+  | "item"
+  | "poder"
+  | "huir";
 
-/** Un evento posible dentro de una sala. */
-export type GameEvent = {
+// --- contenido ------------------------------------------------------------
+
+export type Materia = {
   id: string;
-  /** Lo que se declara desde afuera, antes de entrar. Vago a propósito. */
-  label: string;
-  /** Lo que Observar revela. Acá se dice la verdad. */
-  reveal: string;
-  /** Cómo se llama Actuar para este evento: Tomar, Forzar, Registrar... */
-  actVerb: string;
-  /** Resultado de Actuar sin haber observado. */
-  blind: Outcome;
-  /** Resultado de Actuar habiendo observado. */
-  informed: Outcome;
-  /** En qué se convierte si te quedás demasiado. */
-  maturesTo?: string;
-  hostile?: boolean;
+  nombre: string;
+  /** Qué atributo lastima esta materia. */
+  atributo: Atributo;
+  efecto: Efecto;
+  enemigos: string[];
+  armas: string[];
 };
 
-export type Outcome = {
-  /** Delta de Vigilia. Positivo repone, negativo cuesta. */
-  vigilia: number;
-  text: string;
+/** Lo que el enemigo va a hacer el turno que viene. Se telegrafía siempre. */
+export type Intencion = {
+  tell: string;
+  tipo: "golpe" | "efecto" | "espera";
+  daño?: number;
+  efecto?: Efecto;
 };
 
-/** Una lectura declarada de la sala: un evento posible y su probabilidad. */
-export type Reading = {
-  eventId: string;
-  /** Probabilidad declarada, 0..1. Puede no ser la real. */
-  declared: number;
-  /** La real. El jugador nunca la ve. */
-  actual: number;
-};
-
-export type Room = {
+export type Enemigo = {
   id: string;
-  name: string;
-  readings: Reading[];
-  /**
-   * El evento que realmente va a ocurrir. Se sortea al generar la sala, no al
-   * entrar, para que "Lucidez" pueda mostrarlo antes de que el jugador elija.
-   */
-  rolled: string;
+  nombre: string;
+  vida: number;
+  /** El verbo que le funciona mejor. Descubrirlo es el juego. */
+  debilidad: Extract<Accion, "resolver" | "aguantar" | "esquivar">;
+  /** Patrón cíclico de intenciones. */
+  patron: Intencion[];
+  xp: number;
 };
 
-/** Distorsión. Los campos opcionales son interceptores sobre el motor. */
-export type Distortion = {
+export type Arma = {
   id: string;
-  name: string;
-  tier: "chica" | "grande";
-  /** Texto que se muestra en la pantalla del sueño. */
-  text: string;
-
-  // --- interceptores ---
-  /** Modifica el costo en Vigilia de un verbo. */
-  verbCost?: (verb: Verb, base: number) => number;
-  /** Deforma las probabilidades declaradas antes de mostrarlas. */
-  distortReadings?: (readings: Reading[], rng: Rng) => Reading[];
-  /** Oculta del todo las lecturas: sólo se ve el nombre de la sala. */
-  hideReadings?: boolean;
-  /** Revela el evento real antes de entrar. */
-  revealBeforeEntering?: boolean;
-  /** Techo de acciones por sala. */
-  maxActions?: number;
-  /** Cuántas acciones de más aguanta el evento antes de madurar. */
-  maturationBonus?: number;
-  /** Vigilia que devuelve retirarse. */
-  withdrawRefund?: number;
-  /** Vigilia extra al resolver un evento. */
-  outcomeBonus?: (informed: boolean) => number;
-  /** Entrar a una sala no cuesta Vigilia. */
-  freeEntry?: boolean;
-  /** No se puede dormir por voluntad propia. */
-  noVoluntarySleep?: boolean;
+  nombre: string;
+  daño: number;
+  /** Texto al usarla. */
+  texto: string;
 };
 
-export type Phase =
-  | "eligiendo-sala"
-  | "en-sala"
-  | "durmiendo"
+export type Item = {
+  id: string;
+  nombre: string;
+  descripcion: string;
+  efecto: { vida?: number; limpia?: boolean; daño?: number };
+};
+
+/** Poder y defecto se sortean por separado: 6 × 6 = 36 ofertas. */
+export type Poder = {
+  id: string;
+  nombre: string;
+  texto: string;
+  usos: number;
+  /** Daño directo, curación, o limpieza de efectos. */
+  efecto: { daño?: number; vida?: number; limpia?: boolean; anula?: boolean };
+};
+
+export type Defecto = {
+  id: string;
+  nombre: string;
+  texto: string;
+  // --- interceptores sobre el motor ---
+  /** Modifica el daño que hacés. */
+  daño?: (base: number) => number;
+  /** Modifica el daño que recibís. */
+  recibido?: (base: number) => number;
+  /** Vida máxima. */
+  vidaMax?: (base: number) => number;
+  /** No se puede huir. */
+  sinHuida?: boolean;
+  /** Aulas ofrecidas por vez. */
+  menosAulas?: boolean;
+  /** Los efectos duran un turno más. */
+  efectosLargos?: boolean;
+};
+
+// --- estado ---------------------------------------------------------------
+
+export type EfectoActivo = { efecto: Efecto; turnos: number };
+
+export type Combate = {
+  enemigoId: string;
+  materiaId: string;
+  vida: number;
+  vidaMax: number;
+  /** Índice dentro del patrón del enemigo. */
+  paso: number;
+  /** Si el jugador está aguantando este turno. */
+  aguantando: boolean;
+  /** Debilidad ya descubierta por el jugador. */
+  debilidadVista: boolean;
+};
+
+export type Aula = {
+  id: string;
+  materiaId: string;
+  /** Enemigos posibles con su probabilidad declarada. */
+  lecturas: { enemigoId: string; prob: number }[];
+  /** El que realmente está. */
+  sorteado: string;
+};
+
+export type Fase =
+  | "eligiendo-aula"
+  | "combate"
+  | "recompensa"
+  | "subir-nivel"
+  | "sueño"
   | "muerto"
   | "fin";
 
-export type State = {
-  seed: number;
-  /** Ciclo actual, 1-indexado. */
-  cycle: number;
-  vigilia: number;
-  vigiliaMax: number;
-  phase: Phase;
-
-  /** Salas ofrecidas en este momento. */
-  rooms: Room[];
-  /** Sala en la que estamos, si phase === "en-sala". */
-  currentRoom: Room | null;
-  /** Evento sorteado para la sala actual. */
-  currentEvent: string | null;
-  /** Si ya lo observamos. */
-  observed: boolean;
-  /** Acciones gastadas en la sala actual (para la maduración). */
-  actionsInRoom: number;
-
-  /** Distorsiones chicas acumuladas. */
-  chicas: string[];
-  /** La grande activa. Sólo puede haber una. */
-  grande: string | null;
-  /** Las tres opciones ofrecidas mientras phase === "durmiendo". */
-  offered: string[];
-  /** Si la distorsión la elige la pesadilla (te desplomaste). */
-  forced: boolean;
-
-  /** Bitácora de la run, lo último primero. */
-  log: LogEntry[];
-  /** Cómo terminó, si terminó. */
-  ending: string | null;
+export type Jugador = {
+  nivel: number;
+  xp: number;
+  xpSiguiente: number;
+  vida: number;
+  vidaMax: number;
+  atributos: Record<Atributo, number>;
+  armaId: string | null;
+  items: string[];
+  sombras: string[];
+  poderes: { id: string; usos: number }[];
+  defectos: string[];
 };
 
-export type LogEntry = {
-  text: string;
-  kind: "neutral" | "bueno" | "malo" | "sueño";
+export type Entrada = {
+  texto: string;
+  tipo: "neutral" | "bueno" | "malo" | "sueño" | "enemigo";
+};
+
+export type State = {
+  seed: number;
+  ciclo: number;
+  /** Aulas completadas en este ciclo. */
+  aulasHechas: number;
+  fase: Fase;
+  jugador: Jugador;
+
+  aulas: Aula[];
+  combate: Combate | null;
+  efectos: EfectoActivo[];
+
+  /** Nivel de deformación por materia: 0 limpia, 3 irreconocible. */
+  deformacion: Record<string, number>;
+  /** Nombres deformados ya asignados. */
+  alias: Record<string, string>;
+
+  /** Oferta del sueño. */
+  oferta: { poderId: string; defectoId: string }[];
+
+  log: Entrada[];
+  final: string | null;
 };
 
 export type Action =
-  | { type: "elegir-sala"; roomId: string }
-  | { type: "verbo"; verb: Verb }
-  | { type: "dormir" }
-  | { type: "elegir-distorsion"; id: string }
+  | { type: "elegir-aula"; aulaId: string }
+  | { type: "combate"; accion: Accion; ref?: string }
+  | { type: "seguir" }
+  | { type: "subir"; atributo: Atributo }
+  | { type: "aceptar-oferta"; index: number }
   | { type: "reiniciar"; seed?: number };
