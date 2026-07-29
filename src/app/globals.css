@@ -68,6 +68,45 @@ body {
   animation: aparecer 0.22s ease-out;
 }
 
+/* Destello rojo en toda la pantalla cuando te entra un golpe. */
+@keyframes destellar {
+  0% {
+    background: rgba(226, 104, 92, 0.32);
+  }
+  60% {
+    background: rgba(226, 104, 92, 0.14);
+  }
+  100% {
+    background: transparent;
+  }
+}
+.destello {
+  animation: destellar 0.4s ease-out;
+}
+
+/* El ícono del efecto entra grande y se va. */
+@keyframes marcar {
+  0% {
+    opacity: 0;
+    transform: scale(0.4);
+  }
+  25% {
+    opacity: 1;
+    transform: scale(1.15);
+  }
+  70% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  100% {
+    opacity: 0;
+    transform: scale(1);
+  }
+}
+.marca {
+  animation: marcar 1.3s ease-out forwards;
+}
+
 @keyframes sacudir {
   0%,
   100% {

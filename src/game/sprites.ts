@@ -19,6 +19,16 @@ export const ICONOS: Record<string, string[]> = {
   fisica: [".###.", "##.##", "#.#.#", "##.##", ".###."],
 };
 
+/** Íconos de los tres estados. Se ven al recibirlos y en la ficha de arriba. */
+export const ICONOS_EFECTO: Record<string, string[]> = {
+  // Un signo de pregunta: dejaste de entender.
+  confusion: [".###.", "#...#", "...#.", ".....", "..#.."],
+  // Un ojo abierto de más.
+  miedo: [".###.", "#...#", "#.#.#", "#...#", ".###."],
+  // Un aspa: el cuerpo no va donde lo mandás.
+  torpeza: ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
+};
+
 export const SPRITES: Record<string, string[]> = {
   matematica: [
     "....####....",

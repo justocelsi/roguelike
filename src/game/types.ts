@@ -116,6 +116,11 @@ export type Jugador = {
 export type Entrada = {
   texto: string;
   tipo: "neutral" | "bueno" | "malo" | "sueño" | "enemigo";
+  /**
+   * Quién lo hizo. La interfaz mete una pausa larga cuando el turno cambia de
+   * manos, para que se lea como una secuencia y no como un bloque.
+   */
+  actor?: "vos" | "eso";
 };
 
 export type State = {

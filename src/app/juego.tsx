@@ -28,11 +28,16 @@ import {
   type Puerta,
 } from "@/game/mundo";
 import { DEFECTOS, PODERES } from "@/game/poderes";
-import { ICONOS, SPRITES } from "@/game/sprites";
+import { ICONOS, ICONOS_EFECTO, SPRITES } from "@/game/sprites";
 import type { Accion, Action, Entrada, State } from "@/game/types";
 
-/** Cuánto tarda en aparecer cada línea del turno. */
-const RITMO = 750;
+/** Cuánto tarda en aparecer cada línea dentro de la acción de uno. */
+const RITMO = 650;
+/**
+ * La pausa cuando el turno cambia de manos. Larga a propósito: es el momento
+ * en que el enemigo se mueve y no querés poder adelantarte.
+ */
+const RITMO_TURNO = 1500;
 
 export default function Juego() {
   const [state, setState] = useState<State | null>(null);
@@ -423,12 +428,12 @@ function Pasillo({
 
 // --- piezas ---------------------------------------------------------------
 
-function Sprite({ materiaId, clase = "" }: { materiaId: string; clase?: string }) {
-  const data = SPRITES[materiaId] ?? SPRITES.matematica;
+/** Dibuja una grilla de texto como bloques. Toma el color de currentColor. */
+function Pixeles({ data, clase = "" }: { data: string[]; clase?: string }) {
   const cols = data[0].length;
   return (
     <div
-      className={`grid w-40 text-agua ${clase}`}
+      className={`grid ${clase}`}
       style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
       aria-hidden
     >
@@ -442,6 +447,15 @@ function Sprite({ materiaId, clase = "" }: { materiaId: string; clase?: string }
         )),
       )}
     </div>
+  );
+}
+
+function Sprite({ materiaId, clase = "" }: { materiaId: string; clase?: string }) {
+  return (
+    <Pixeles
+      data={SPRITES[materiaId] ?? SPRITES.matematica}
+      clase={`w-40 text-agua ${clase}`}
+    />
   );
 }
 
@@ -492,7 +506,11 @@ function Cabecera({ state }: { state: State }) {
       {(state.efectos.length > 0 || j.defectos.length > 0) && (
         <div className="flex flex-wrap gap-2 text-xs">
           {state.efectos.map((e) => (
-            <span key={e.efecto} className="bg-malo px-2 py-0.5 text-background">
+            <span
+              key={e.efecto}
+              className="flex items-center gap-1.5 bg-malo px-2 py-0.5 text-background"
+            >
+              <Pixeles data={ICONOS_EFECTO[e.efecto]} clase="w-2.5" />
               {NOMBRE_EFECTO[e.efecto]} {e.turnos}
             </span>
           ))}
@@ -518,6 +536,8 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
   const vidaEnemigoPrev = useRef<number | null>(null);
   const vidaPrev = useRef(state.jugador.vida);
   const [herido, setHerido] = useState(0);
+  const [avisoEfecto, setAvisoEfecto] = useState<string | null>(null);
+  const efectosPrev = useRef<string[]>([]);
 
   const c = state.combate;
   const vidaEnemigo = c?.vida ?? null;
@@ -537,9 +557,17 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
 
   useEffect(() => {
     if (ocultas <= 0) return;
-    const t = setTimeout(() => setOcultas((o) => Math.max(0, o - 1)), RITMO);
+    // Si la línea que viene la hizo el otro, se espera más: ese silencio es
+    // el turno del enemigo, y durante todo ese rato no podés tocar nada.
+    const proxima = state.log[ocultas - 1];
+    const actual = state.log[ocultas];
+    const cambiaDeManos = (proxima?.actor ?? "vos") !== (actual?.actor ?? "vos");
+    const t = setTimeout(
+      () => setOcultas((o) => Math.max(0, o - 1)),
+      cambiaDeManos ? RITMO_TURNO : RITMO,
+    );
     return () => clearTimeout(t);
-  }, [ocultas]);
+  }, [ocultas, state.log]);
 
   // Sacudida del enemigo cuando le entra, y del borde cuando te entra a vos.
   useEffect(() => {
@@ -554,6 +582,17 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
     if (state.jugador.vida < vidaPrev.current) setHerido((h) => h + 1);
     vidaPrev.current = state.jugador.vida;
   }, [state.jugador.vida]);
+
+  // Cuando te agarra un estado nuevo, se muestra grande un segundo.
+  useEffect(() => {
+    const actuales = state.efectos.map((e) => e.efecto);
+    const nuevo = actuales.find((e) => !efectosPrev.current.includes(e));
+    efectosPrev.current = actuales;
+    if (!nuevo) return;
+    setAvisoEfecto(nuevo);
+    const t = setTimeout(() => setAvisoEfecto(null), 1300);
+    return () => clearTimeout(t);
+  }, [state.efectos]);
 
   if (!c) return null;
   const enemigo = ENEMIGOS[c.enemigoId];
@@ -595,6 +634,26 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
 
   return (
     <section className="space-y-4">
+      {/* Destello en toda la pantalla: te entró. */}
+      {herido > 0 && (
+        <div
+          key={`destello-${herido}`}
+          className="destello pointer-events-none fixed inset-0 z-50"
+        />
+      )}
+
+      {/* Y el ícono de lo que te agarró, grande y un segundo. */}
+      {avisoEfecto && (
+        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
+          <div className="marca flex flex-col items-center gap-3 text-malo">
+            <Pixeles data={ICONOS_EFECTO[avisoEfecto]} clase="w-20" />
+            <span className="text-xs font-bold tracking-[0.3em]">
+              {NOMBRE_EFECTO[avisoEfecto]}
+            </span>
+          </div>
+        </div>
+      )}
+
       <div
         key={`herido-${herido}`}
         className={`flex flex-col items-center gap-3 border p-5 ${

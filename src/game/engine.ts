@@ -102,8 +102,9 @@ function log(
   entradas: Entrada[],
   texto: string,
   tipo: Entrada["tipo"] = "neutral",
+  actor?: Entrada["actor"],
 ): Entrada[] {
-  return [{ texto, tipo }, ...entradas].slice(0, 30);
+  return [{ texto, tipo, actor }, ...entradas].slice(0, 30);
 }
 
 function aplicarDaño(state: State, base: number): number {
@@ -203,6 +204,8 @@ function turnoEnemigo(state: State, rng: Rng): State {
   const enemigo = ENEMIGOS[c.enemigoId];
   const intencion = enemigo.patron[c.paso % enemigo.patron.length];
   let s = state;
+  /** Marca de agua: todo lo que se loguee de acá en más lo hizo el enemigo. */
+  const tope = state.log[0];
 
   let contra = 0;
   const acierta = random(rng) <= (intencion.precision ?? 0.85);
@@ -252,8 +255,15 @@ function turnoEnemigo(state: State, rng: Rng): State {
     }
   }
 
+  // Todo lo agregado en este turno lleva la firma del enemigo.
+  const corte = tope ? s.log.indexOf(tope) : s.log.length;
+  const firmado = s.log.map((e, i) =>
+    i < (corte === -1 ? s.log.length : corte) ? { ...e, actor: "eso" as const } : e,
+  );
+
   return {
     ...s,
+    log: firmado,
     combate: {
       ...c,
       vida: s.combate!.vida - contra,
@@ -266,7 +276,12 @@ function turnoEnemigo(state: State, rng: Rng): State {
 function cerrarTurno(state: State, rng: Rng): State {
   let s = turnoEnemigo(state, rng);
   if (tieneEfecto(s, "torpeza") && s.jugador.vida > 0) {
-    s = { ...s, log: log(s.log, "Todavía no terminaste de moverte.", "enemigo") };
+    // Sigue siendo el turno del enemigo: va firmado como suyo para que la
+    // pausa larga caiga antes de esta línea y no en el medio.
+    s = {
+      ...s,
+      log: log(s.log, "Todavía no terminaste de moverte.", "enemigo", "eso"),
+    };
     s = turnoEnemigo(s, rng);
   }
   s = {
