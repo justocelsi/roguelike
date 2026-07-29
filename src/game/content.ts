@@ -18,7 +18,7 @@ export const MATERIAS: Record<string, Materia> = {
     efecto: "confusion",
     enemigos: ["teorema", "demostracion", "problema"],
     armas: ["regla", "compas"],
-    items: ["tiza"],
+    items: ["tiza", "cafe"],
   },
   literatura: {
     id: "literatura",
@@ -26,7 +26,7 @@ export const MATERIAS: Record<string, Materia> = {
     efecto: "confusion",
     enemigos: ["libro", "narrador"],
     armas: ["diccionario"],
-    items: ["apunte"],
+    items: ["apunte", "anteojos"],
   },
   historia: {
     id: "historia",
@@ -58,7 +58,7 @@ export const MATERIAS: Record<string, Materia> = {
     efecto: "torpeza",
     enemigos: ["ultimo", "soga"],
     armas: ["pelota"],
-    items: ["agua", "caramelo"],
+    items: ["agua", "caramelo", "energizante"],
   },
 };
 
@@ -324,6 +324,27 @@ export const ITEMS: Record<string, Item> = {
     descripcion: "Recuperás 8.",
     precision: 0.95,
     efecto: { vida: 8 },
+  },
+  cafe: {
+    id: "cafe",
+    nombre: "el café de la sala",
+    descripcion: "Todo lo que hagas pega 4 más por el resto de la pelea. Se acumula.",
+    precision: 0.95,
+    efecto: { buff: 4 },
+  },
+  anteojos: {
+    id: "anteojos",
+    nombre: "los anteojos de alguien",
+    descripcion: "Lo ves venir y no te toca: el próximo golpe no te entra.",
+    precision: 0.9,
+    efecto: { escudo: true },
+  },
+  energizante: {
+    id: "energizante",
+    nombre: "la lata del quiosco",
+    descripcion: "Perdés 4 por turno, pero te devuelve la mitad de lo que hacés.",
+    precision: 0.88,
+    efecto: { sangria: { porTurno: 4, robo: 0.5 } },
   },
   venda: {
     id: "venda",

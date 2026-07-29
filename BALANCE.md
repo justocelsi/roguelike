@@ -49,19 +49,19 @@ distintas de jugar caigan en una banda parecida**, y que las degeneradas
 
 | Estilo | Muertes |
 |---|---|
-| Luchador: corre a terminar la pelea, nunca bloquea | 52,3% |
-| Calculador: bloquea, salvo que pueda matarlo antes del golpe | 54,6% |
-| Pasivo: bloquea siempre que puede | 60,0% |
+| Calculador: bloquea, salvo que pueda matarlo antes del golpe | 50,4% |
+| Luchador: corre a terminar la pelea, nunca bloquea | 50,9% |
+| Pasivo: bloquea siempre que puede | 59,0% |
 
 **Estilos de pasillo** — cuánto explorás y cuándo gastás:
 
 | Estilo | Muertes |
 |---|---|
-| Limpia todo, cura apenas baja la vida | 59,8% |
-| Limpia todo a lo bruto | 62,0% |
-| Limpia todo, guarda los items para el profesor | 62,5% |
-| Limpia la mitad del pasillo | 62,6% |
-| **Va derecho al profesor** | **95,6%** |
+| Limpia todo, cura apenas baja la vida | 55,2% |
+| Limpia todo a lo bruto | 58,7% |
+| Limpia todo, guarda los items para el profesor | 58,8% |
+| Limpia la mitad del pasillo | 59,6% |
+| **Va derecho al profesor** | **94,4%** |
 
 **Degeneradas:** repetir una sola acción muere el 100%.
 
@@ -251,6 +251,27 @@ simultáneos eran imposibles. Tres profesores ahora aplican dos tipos distintos.
 que el equipo importe más y ensancha la brecha contra saltearse el pasillo.
 
 ---
+
+### Tres formas nuevas de item
+
+Tomadas de NO-SKIN, elegidas porque agregan **formas** que no teníamos, no más
+efectos del mismo tipo:
+
+| Item | De dónde sale | Qué agrega |
+|---|---|---|
+| El café de la sala | *Nightshade* | Buff que dura toda la pelea y se acumula |
+| Los anteojos | *Heart Glasses* | Escudo que come el próximo golpe |
+| La lata del quiosco | *Liquor Bottle* | Te desangra pero te cura por lo que hacés |
+
+Los anteojos existen sobre todo como respuesta a los golpes imparables: te
+dejan atacar en el turno en que cubrirse no sirve de nada.
+
+**Lo que encontró el test:** el cobro por turno de la lata nunca se había
+conectado — el parche apuntaba a un texto que ya no estaba en el archivo. En
+el juego se veía como un item que sólo curaba y nunca cobraba. También estaba
+desconectada la red de seguridad de *Segundo aire*, por la misma razón. Nueve
+chequeos sobre los tres items nuevos, verificando el número exacto y no sólo
+que "pasa algo".
 
 ## Cómo volver atrás
 

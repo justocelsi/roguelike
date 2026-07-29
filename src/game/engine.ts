@@ -251,7 +251,24 @@ function logEstado(
 /** Le saca vida al enemigo dejando el estado listo para anotar el evento. */
 function dañar(s: State, d: number): State {
   if (!s.combate) return s;
-  return { ...s, combate: { ...s.combate, vida: s.combate.vida - d } };
+  const robo = s.combate.sangria
+    ? Math.round(d * s.combate.sangria.robo)
+    : 0;
+  return {
+    ...s,
+    combate: { ...s.combate, vida: s.combate.vida - d },
+    jugador: robo
+      ? { ...s.jugador, vida: Math.min(s.jugador.vidaMax, s.jugador.vida + robo) }
+      : s.jugador,
+  };
+}
+
+/** Firma como del enemigo todo lo agregado desde `tope`. */
+function firmar(s: State, tope: Entrada | undefined): Entrada[] {
+  const corte = tope ? s.log.indexOf(tope) : s.log.length;
+  return s.log.map((e, i) =>
+    i < (corte === -1 ? s.log.length : corte) ? { ...e, actor: "eso" as const } : e,
+  );
 }
 
 /**
@@ -265,7 +282,7 @@ export function potencia(state: State): number {
 const POR_PROFESOR = Number(process.env.NEXT_PUBLIC_POTENCIA ?? 0.4);
 
 function aplicarDaño(state: State, base: number): number {
-  let d = base * potencia(state);
+  let d = (base + (state.combate?.buff ?? 0)) * potencia(state);
   for (const def of defectosActivos(state)) if (def.daño) d = def.daño(d);
   return Math.max(1, Math.round(d));
 }
@@ -382,6 +399,15 @@ function turnoEnemigo(state: State, rng: Rng): State {
       // con él la barra, llegan en el evento siguiente.
       let daño = aplicarRecibido(s, (intencion.daño ?? 0) * MULT_ENEMIGO * escalaDaño(s));
       s = { ...s, log: logEstado(s, intencion.impacto ?? "Te alcanza.", "enemigo") };
+      if (s.combate!.escudo) {
+        s = { ...s, combate: { ...s.combate!, escudo: false } };
+        s = { ...s, log: logEstado(s, "Lo viste llegar y no te tocó.", "bueno") };
+        return {
+          ...s,
+          log: firmar(s, tope),
+          combate: { ...s.combate!, paso: c.paso + 1, bloqueando: false },
+        };
+      }
       if (bloqueaBien) daño = Math.max(1, Math.round(daño * PASA_BLOQUEANDO));
       s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
       if (bloqueaBien) {
@@ -424,15 +450,9 @@ function turnoEnemigo(state: State, rng: Rng): State {
     s = { ...s, log: logEstado(s, "No hace nada. Todavía.", "neutral") };
   }
 
-  // Todo lo agregado en este turno lleva la firma del enemigo.
-  const corte = tope ? s.log.indexOf(tope) : s.log.length;
-  const firmado = s.log.map((e, i) =>
-    i < (corte === -1 ? s.log.length : corte) ? { ...e, actor: "eso" as const } : e,
-  );
-
   return {
     ...s,
-    log: firmado,
+    log: firmar(s, tope),
     combate: { ...s.combate!, paso: c.paso + 1, bloqueando: false },
   };
 }
@@ -476,10 +496,18 @@ function cerrarTurno(state: State, rng: Rng): State {
     };
     s = turnoEnemigo(s, rng);
   }
+  // La lata te cobra su parte todos los turnos, hayas hecho lo que hayas hecho.
+  if (s.combate?.sangria && s.jugador.vida > 0) {
+    const costo = s.combate.sangria.porTurno;
+    s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - costo } };
+    s = { ...s, log: logEstado(s, `La lata te cobra ${costo}.`, "malo", "vos") };
+  }
+
   s = {
     ...s,
     efectos: s.efectos.map((e) => ({ ...e, turnos: e.turnos - 1 })).filter((e) => e.turnos > 0),
   };
+  s = redDeSeguridad(s);
 
   if (s.jugador.vida <= 0) {
     return {
@@ -647,6 +675,9 @@ function apply(state: State, action: Action, rng: Rng): State {
           poderesUsados: {},
           primerGolpeHecho: false,
           redUsada: false,
+          buff: 0,
+          escudo: false,
+          sangria: null,
         },
         // Entrás, y lo primero que pasa es que ves qué va a hacer.
         log: log(
@@ -934,6 +965,13 @@ function turnoDeCombate(
       }
       if (item.efecto.daño) s = dañar(s, aplicarDaño(s, item.efecto.daño));
       if (item.efecto.limpia) s = { ...s, efectos: [] };
+      if (item.efecto.buff) {
+        s = { ...s, combate: { ...s.combate!, buff: s.combate!.buff + item.efecto.buff } };
+      }
+      if (item.efecto.escudo) s = { ...s, combate: { ...s.combate!, escudo: true } };
+      if (item.efecto.sangria) {
+        s = { ...s, combate: { ...s.combate!, sangria: item.efecto.sangria } };
+      }
       s = { ...s, log: logEstado(s, `Usás ${item.nombre}.`, "bueno") };
       break;
     }

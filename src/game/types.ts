@@ -80,7 +80,17 @@ export type Item = {
   nombre: string;
   descripcion: string;
   precision: number;
-  efecto: { vida?: number; limpia?: boolean; daño?: number };
+  efecto: {
+    vida?: number;
+    limpia?: boolean;
+    daño?: number;
+    /** Suma a todo lo que hagas por el resto de la pelea. Se acumula. */
+    buff?: number;
+    /** Absorbe entero el próximo golpe que te entre. */
+    escudo?: boolean;
+    /** Te desangra cada turno pero te devuelve parte de lo que hacés. */
+    sangria?: { porTurno: number; robo: number };
+  };
 };
 
 export type Poder = {
@@ -145,6 +155,10 @@ export type Combate = {
   /** Pasivos que se disparan una vez por pelea: acá se anota que ya pasó. */
   primerGolpeHecho: boolean;
   redUsada: boolean;
+  /** Lo que aportan los items que duran toda la pelea. */
+  buff: number;
+  escudo: boolean;
+  sangria: { porTurno: number; robo: number } | null;
 };
 
 export type Fase = "pasillo" | "combate" | "recompensa" | "sueño" | "muerto" | "fin";

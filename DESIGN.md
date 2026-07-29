@@ -69,12 +69,22 @@ que sabés es una herramienta.
 
 | Materia | Armas | Items |
 |---|---|---|
-| Matemática | la regla, el compás | la tiza |
-| Literatura | el diccionario | el apunte de otro |
+| Matemática | la regla, el compás | la tiza, **el café de la sala** |
+| Literatura | el diccionario | el apunte, **los anteojos de alguien** |
 | Historia | el puntero | el apunte, el caramelo |
 | Biología | el bisturí | la venda, la botella |
 | Química | el mechero, el ácido | el alcohol, la tiza |
-| Ed. Física | la pelota | la botella, el caramelo |
+| Ed. Física | la pelota | la botella, el caramelo, **la lata del quiosco** |
+
+Los items no son todos del mismo tipo. Además de los instantáneos hay tres
+formas distintas, tomadas de NO-SKIN:
+
+- **El café** suma daño **por el resto de la pelea** y se acumula. Se decide
+  temprano, que es cuando menos sabés contra qué estás.
+- **Los anteojos** absorben el próximo golpe entero. Es la respuesta a un
+  golpe imparable: te dejan atacar en el turno en que cubrirse no sirve.
+- **La lata** te cobra 4 por turno pero te devuelve la mitad de lo que hacés.
+  Riesgo puro; premia al que corre a terminar la pelea.
 
 ### Armas
 
