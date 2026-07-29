@@ -388,11 +388,14 @@ function ganarCombate(state: State, rng: Rng): State {
   };
   let l = log(state.log, `${enemigo.nombre} deja de estar.`, "bueno");
   let armaOfrecida: string | null = null;
+  // Lo que sacaste, listado uno por uno. La sombra siempre cae.
+  const botin: State["botin"] = [{ tipo: "sombra", id: enemigo.id, cantidad: 1 }];
 
   if (enemigo.profesor) {
     // Vencer a un profesor es la única progresión permanente que hay.
     const nuevaMax = vidaMaxima(state, state.jugador.vidaMax + 6);
     jugador = { ...jugador, vidaMax: nuevaMax, vida: nuevaMax };
+    botin.push({ tipo: "vida", id: "vidaMax", cantidad: 6 });
     l = log(l, "Aguantás un poco más que antes. +6 de vida máxima.", "bueno");
   } else if (materia && random(rng) < 0.45) {
     const armaId = pick(rng, materia.armas);
@@ -403,6 +406,7 @@ function ganarCombate(state: State, rng: Rng): State {
       l = log(l, `Otra ${arma.nombre}. Dejás la que estaba.`, "neutral");
     } else if (jugador.armas.length < MAX_ARMAS) {
       jugador = { ...jugador, armas: [...jugador.armas, armaId] };
+      botin.push({ tipo: "arma", id: armaId, cantidad: 1 });
       l = log(l, `Agarrás ${arma.nombre}. ${cuenta}.`, "bueno");
     } else {
       // Mochila llena: la decisión de qué dejar es del jugador.
@@ -410,8 +414,12 @@ function ganarCombate(state: State, rng: Rng): State {
       l = log(l, `Hay ${arma.nombre}. ${cuenta}. No te entra nada más.`, "neutral");
     }
   } else if (jugador.items.length < 6) {
+    // A veces cae más de uno; se listan con su cantidad.
+    const cuantos = random(rng) < 0.25 ? 2 : 1;
     const itemId = pick(rng, ITEM_IDS);
-    jugador = { ...jugador, items: [...jugador.items, itemId] };
+    const caben = Math.min(cuantos, 6 - jugador.items.length);
+    jugador = { ...jugador, items: [...jugador.items, ...Array(caben).fill(itemId)] };
+    botin.push({ tipo: "item", id: itemId, cantidad: caben });
     l = log(l, `Guardás ${ITEMS[itemId].nombre}.`, "bueno");
   }
 
@@ -423,6 +431,7 @@ function ganarCombate(state: State, rng: Rng): State {
     fase: "recompensa",
     cicloTerminado: !!enemigo.profesor,
     armaOfrecida,
+    botin,
     log: l,
   };
 }
@@ -452,6 +461,7 @@ export function initialState(seed: number = randomSeed()): State {
     cicloTerminado: false,
     oferta: [],
     armaOfrecida: null,
+    botin: [],
     log: [{ texto: "Hace tres días que no dormís bien. Sonó el timbre.", tipo: "neutral" }],
     final: null,
   };

@@ -213,6 +213,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
       { tell: "Destapa la lapicera.", tipo: "espera" },
       { tell: "Tacha algo tuyo.", tipo: "golpe", impacto: "Tacha algo que habías hecho bien.", daño: 16 , precision: 0.88 },
       { tell: "Te muestra la hoja.", tipo: "efecto", efecto: "confusion" , precision: 0.9 },
+      { tell: "Te mira mientras escribe.", tipo: "efecto", efecto: "miedo", precision: 0.88 },
       { tell: "Sigue corrigiendo.", tipo: "golpe", impacto: "Sigue. La hoja te queda entera en rojo.", daño: 20 , precision: 0.88 },
     ],
   },
@@ -225,6 +226,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
       { tell: "Te pide que te quedes quieto.", tipo: "efecto", efecto: "miedo" , precision: 0.9 },
       { tell: "Señala exactamente el lugar.", tipo: "golpe", impacto: "Apoya el dedo justo donde duele.", daño: 18 , precision: 0.88 },
       { tell: "Espera a que respires.", tipo: "espera" },
+      { tell: "Te toma el pulso.", tipo: "efecto", efecto: "torpeza", precision: 0.88 },
       { tell: "Ahí.", tipo: "golpe", impacto: "Ahí. Sabía dónde desde antes de que entraras.", daño: 22 , precision: 0.88 },
     ],
   },
@@ -270,6 +272,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     patron: [
       { tell: "Ocho.", tipo: "espera" },
       { tell: "Nueve.", tipo: "efecto", efecto: "torpeza" , precision: 0.9 },
+      { tell: "Te mira a vos cuando cuenta.", tipo: "efecto", efecto: "miedo", precision: 0.88 },
       { tell: "Diez.", tipo: "golpe", impacto: "Diez. Se acabó el tiempo para todos.", daño: 24 , precision: 0.88 },
     ],
   },
@@ -323,6 +326,16 @@ export const ITEMS: Record<string, Item> = {
     precision: 0.75,
     efecto: { daño: 12 },
   },
+};
+
+/** Qué te hace cada estado. Se muestra al pasar por encima de su etiqueta. */
+export const EXPLICACION_EFECTO: Record<string, string> = {
+  confusion:
+    "Los números de la pantalla se muestran mal. Tu vida, la del enemigo y los porcentajes dejan de ser confiables.",
+  miedo:
+    "Tres de cada diez acciones tuyas no salen: te quedás duro y perdés el turno. Se multiplica con la precisión de lo que uses.",
+  torpeza:
+    "El enemigo actúa dos veces por cada turno tuyo. Un golpe telegrafiado te llega el doble.",
 };
 
 export const MATERIA_IDS = Object.keys(MATERIAS);

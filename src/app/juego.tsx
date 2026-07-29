@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ARMAS, ENEMIGOS, ITEMS } from "@/game/content";
+import { ARMAS, ENEMIGOS, EXPLICACION_EFECTO, ITEMS } from "@/game/content";
 import {
   CICLOS,
   confundido,
@@ -410,7 +410,7 @@ function Pasillo({
               e.stopPropagation();
               entrarRef.current(cerca);
             }}
-            className="absolute right-3 top-3 rounded-full bg-agua px-5 py-3 text-xs font-bold tracking-widest text-background md:hidden"
+            className="absolute right-3 top-3 rounded-full bg-agua px-5 py-3 text-sm font-bold tracking-widest text-background md:hidden"
           >
             ENTRAR
           </button>
@@ -419,7 +419,7 @@ function Pasillo({
         {cerca && (
           <div className="absolute inset-x-0 bottom-0 border-t border-agua bg-background/95 p-3">
             {cerca.usada ? (
-              <p className="text-center text-xs text-dim">Ya entraste acá.</p>
+              <p className="text-center text-sm text-dim">Ya entraste acá.</p>
             ) : (
               <>
                 <div className="flex items-baseline justify-between">
@@ -428,12 +428,12 @@ function Pasillo({
                       ? ENEMIGOS[cerca.sorteado].nombre
                       : nombreDe(state, cerca.materiaId)}
                   </span>
-                  <span className="text-xs text-dim">[E] entrar</span>
+                  <span className="text-sm text-dim">[E] entrar</span>
                 </div>
                 {!cerca.profesor && (
                   <ul className="mt-1 flex flex-wrap gap-x-4">
                     {cerca.lecturas.map((l) => (
-                      <li key={l.enemigoId} className="text-xs text-dim">
+                      <li key={l.enemigoId} className="text-sm text-dim">
                         <span className="tabular-nums text-foreground">
                           {num(l.prob * 100, c)}%
                         </span>{" "}
@@ -448,7 +448,7 @@ function Pasillo({
         )}
       </div>
 
-      <p className="text-xs text-dim">
+      <p className="text-sm text-dim">
         WASD, flechas o arrastrá el dedo · [E] para entrar · al fondo del
         pasillo está el profesor
       </p>
@@ -516,6 +516,38 @@ const NOMBRE_EFECTO: Record<string, string> = {
   torpeza: "TORPEZA",
 };
 
+/**
+ * Etiqueta de estado. Al pasar por encima —o tocarla— explica qué te hace,
+ * porque el nombre solo no alcanza para decidir.
+ */
+function Etiqueta({
+  children,
+  clase,
+  explicacion,
+}: {
+  children: React.ReactNode;
+  clase: string;
+  explicacion: string;
+}) {
+  return (
+    <span className="group relative inline-block">
+      <span
+        tabIndex={0}
+        title={explicacion}
+        className={`flex cursor-help items-center gap-1.5 px-2.5 py-1 ${clase}`}
+      >
+        {children}
+      </span>
+      <span
+        role="tooltip"
+        className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 border border-agua bg-background p-3 text-sm leading-snug text-foreground shadow-lg group-hover:block group-focus-within:block"
+      >
+        {explicacion}
+      </span>
+    </span>
+  );
+}
+
 /** Cuántos usos mostrar de un arma: ∞ para las que no se gastan. */
 function usosTexto(state: State, id: string): string {
   if (ARMAS[id].infinita) return "∞";
@@ -528,7 +560,7 @@ function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number
   const vida = vidaMostrada ?? j.vida;
   return (
     <header className="space-y-2">
-      <div className="flex items-baseline justify-between text-xs tracking-widest text-dim">
+      <div className="flex items-baseline justify-between text-sm tracking-widest text-dim">
         <span className="text-agua">
           CICLO {state.ciclo}/{CICLOS}
         </span>
@@ -539,27 +571,34 @@ function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number
         </span>
       </div>
       <Barra valor={vida} max={j.vidaMax} />
-      <div className="flex justify-between text-xs text-dim">
+      <div className="flex justify-between text-sm text-dim">
         <span className="tabular-nums">
           {num(vida, c)}/{num(j.vidaMax, c)}
         </span>
         <span>{j.items.length + j.sombras.length} en el bolsillo</span>
       </div>
+      {/* Se apilan y se envuelven: si te agarran dos cosas, se ven las dos. */}
       {(state.efectos.length > 0 || j.defectos.length > 0) && (
-        <div className="flex flex-wrap gap-2 text-xs">
+        <div className="flex flex-wrap items-start gap-2 text-sm">
           {state.efectos.map((e) => (
-            <span
+            <Etiqueta
               key={e.efecto}
-              className="flex items-center gap-1.5 bg-malo px-2 py-0.5 text-background"
+              clase="bg-malo text-background"
+              explicacion={EXPLICACION_EFECTO[e.efecto]}
             >
-              <Pixeles data={ICONOS_EFECTO[e.efecto]} clase="w-2.5" />
-              {NOMBRE_EFECTO[e.efecto]} {e.turnos}
-            </span>
+              <Pixeles data={ICONOS_EFECTO[e.efecto]} clase="w-3 shrink-0" />
+              {NOMBRE_EFECTO[e.efecto]}
+              <span className="tabular-nums opacity-70">{e.turnos}</span>
+            </Etiqueta>
           ))}
           {j.defectos.map((d) => (
-            <span key={d} className="border border-sueno px-2 py-0.5 text-sueno">
+            <Etiqueta
+              key={d}
+              clase="border border-sueno text-sueno"
+              explicacion={DEFECTOS[d].texto}
+            >
               {DEFECTOS[d].nombre}
-            </span>
+            </Etiqueta>
           ))}
         </div>
       )}
@@ -665,7 +704,7 @@ function EventoEnLinea({
         entrada.aviso ? "border-agua bg-agua/5" : "border-agua-hondo"
       }`}
     >
-      <span className="text-[10px] tracking-[0.4em] text-dim">
+      <span className="text-xs tracking-[0.35em] text-dim">
         {entrada.aviso
           ? "SE DECIDE"
           : (entrada.actor ?? "vos") === "vos"
@@ -676,7 +715,7 @@ function EventoEnLinea({
         {entrada.texto}
       </p>
       {/* El número va pegado abajo del texto que lo describe en abstracto. */}
-      {entrada.aviso && numeros && <p className="text-xs text-dim">{numeros}</p>}
+      {entrada.aviso && numeros && <p className="text-sm text-dim">{numeros}</p>}
     </div>
   );
 }
@@ -788,7 +827,7 @@ function Combate({
         <p className="text-center text-sm">{enemigo.nombre}</p>
         <div className="w-full space-y-1">
           <Barra valor={vidaEnemigo} max={c.vidaMax} color="bg-malo" />
-          <div className="text-right text-xs tabular-nums text-dim">
+          <div className="text-right text-sm tabular-nums text-dim">
             {num(vidaEnemigo, conf)}/{num(c.vidaMax, conf)}
           </div>
         </div>
@@ -800,9 +839,9 @@ function Combate({
         <EventoEnLinea entrada={actual} k={restantes} numeros={numerosDe(intencion)} />
       ) : (
         <div className="flex min-h-20 flex-col justify-center gap-1.5 border-l-2 border-agua px-4 py-3">
-          <span className="text-[10px] tracking-[0.4em] text-dim">VA A HACER</span>
+          <span className="text-xs tracking-[0.35em] text-dim">VA A HACER</span>
           <p className="text-base leading-snug text-agua">{intencion.tell}</p>
-          <p className="text-xs text-dim">{numerosDe(intencion)}</p>
+          <p className="text-sm text-dim">{numerosDe(intencion)}</p>
         </div>
       )}
 
@@ -837,7 +876,7 @@ function Combate({
             <button
               key={id}
               onClick={() => act("arma", id)}
-              className="block w-full text-left text-xs text-foreground hover:text-agua"
+              className="block w-full text-left text-sm text-foreground hover:text-agua"
             >
               {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
               {pct(precisionArma(state, id))}% · {usosTexto(state, id)} usos
@@ -853,7 +892,7 @@ function Combate({
             <button
               key={g.key}
               onClick={() => act("usar", g.ref)}
-              className={`block w-full text-left text-xs hover:text-foreground ${g.clase}`}
+              className={`block w-full text-left text-sm hover:text-foreground ${g.clase}`}
             >
               {g.texto}
             </button>
@@ -864,7 +903,7 @@ function Combate({
       <button
         onClick={() => act("huir")}
         disabled={!puedeHuir(state) || contando}
-        className="w-full border border-dimmer p-2 text-xs tracking-widest text-dim hover:border-dim disabled:opacity-25"
+        className="w-full border border-dimmer p-2 text-sm tracking-widest text-dim hover:border-dim disabled:opacity-25"
       >
         {puedeHuir(state) ? "SALIR AL PASILLO" : "LA PUERTA NO ABRE"}
       </button>
@@ -889,10 +928,24 @@ function Boton({
       disabled={disabled}
       className="border border-dimmer p-3 text-center transition-colors hover:border-agua disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-dimmer"
     >
-      <div className="truncate text-xs font-bold">{label}</div>
-      {sub && <div className="mt-0.5 text-xs text-dim">{sub}</div>}
+      <div className="truncate text-sm font-bold">{label}</div>
+      {sub && <div className="mt-0.5 text-sm text-dim">{sub}</div>}
     </button>
   );
+}
+
+/** Cómo se llama cada cosa que sacaste del aula. */
+function nombreBotin(b: State["botin"][number]): string {
+  switch (b.tipo) {
+    case "item":
+      return ITEMS[b.id].nombre;
+    case "arma":
+      return ARMAS[b.id].nombre;
+    case "sombra":
+      return `la sombra de ${ENEMIGOS[b.id].nombre}`;
+    case "vida":
+      return `${b.cantidad} de vida máxima`;
+  }
 }
 
 function Recompensa({
@@ -907,19 +960,29 @@ function Recompensa({
   const nueva = state.armaOfrecida;
   return (
     <section className="space-y-4 border border-agua-hondo p-5">
-      <p className="text-xs tracking-widest text-agua">
+      <p className="text-sm tracking-widest text-agua">
         {state.cicloTerminado ? "SE TERMINÓ EL DÍA" : "EL AULA QUEDA VACÍA"}
       </p>
-      {state.log.slice(0, 3).map((e, i) => (
-        <p key={i} className={`text-xs ${COLOR[e.tipo]}`}>
-          {e.texto}
-        </p>
-      ))}
+
+      {/* Lo que sacaste, uno por uno y con cantidad. */}
+      {state.botin.length > 0 && (
+        <ul className="space-y-1.5 border-y border-borde-suave py-3">
+          {state.botin.map((b, i) => (
+            <li key={i} className="flex items-baseline gap-2 text-sm">
+              <span className="text-agua">+</span>
+              <span className="text-foreground">{nombreBotin(b)}</span>
+              {b.cantidad > 1 && (
+                <span className="tabular-nums text-dim">×{b.cantidad}</span>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
 
       {/* Mochila llena: no se sale del aula sin decidir qué se deja. */}
       {nueva ? (
         <div className="space-y-2 border-t border-dimmer pt-4">
-          <p className="text-xs text-dim">
+          <p className="text-sm text-dim">
             Llevás {MAX_ARMAS}. Para agarrar {ARMAS[nueva].nombre} ({ARMAS[nueva].daño} de
             daño · {Math.round(ARMAS[nueva].precision * 100)}% ·{" "}
             {ARMAS[nueva].infinita ? "no se gasta" : `${ARMAS[nueva].usos} usos`}) tenés
@@ -929,7 +992,7 @@ function Recompensa({
             <button
               key={id}
               onClick={() => dispatch({ type: "canjear-arma", dejar: id })}
-              className="block w-full border border-dimmer p-2 text-left text-xs hover:border-agua"
+              className="block w-full border border-dimmer p-2 text-left text-sm hover:border-agua"
             >
               soltar {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
               {Math.round(ARMAS[id].precision * 100)}% ·{" "}
@@ -938,7 +1001,7 @@ function Recompensa({
           ))}
           <button
             onClick={() => dispatch({ type: "canjear-arma", dejar: null })}
-            className="block w-full border border-dimmer p-2 text-left text-xs text-dim hover:border-dim"
+            className="block w-full border border-dimmer p-2 text-left text-sm text-dim hover:border-dim"
           >
             dejarla donde está
           </button>
@@ -947,7 +1010,7 @@ function Recompensa({
         <button
           onClick={() => dispatch({ type: "seguir" })}
           disabled={contando}
-          className="w-full bg-agua p-3 text-xs font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
+          className="w-full bg-agua p-3 text-sm font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
         >
           {state.cicloTerminado ? "DORMIR" : "VOLVER AL PASILLO"}
         </button>
@@ -963,7 +1026,7 @@ function Sueño({ state, dispatch }: { state: State; dispatch: (a: Action) => vo
     <section className="-mx-5 -my-8 min-h-screen bg-[#e8eeeb] px-6 py-12 text-[#1a2b28]">
       <div className="mx-auto max-w-xl space-y-8">
         <div className="space-y-2 text-center">
-          <p className="text-xs tracking-[0.3em] text-[#4a625d]">POR FIN</p>
+          <p className="text-sm tracking-[0.3em] text-[#4a625d]">POR FIN</p>
           <p className="text-sm leading-relaxed">
             Todo está en orden. Las cosas tienen el tamaño que les corresponde y
             nada te está mirando. Alguien dejó tres cosas sobre el banco.
@@ -981,17 +1044,17 @@ function Sueño({ state, dispatch }: { state: State; dispatch: (a: Action) => vo
                 className="w-full border border-[#b9c7c2] bg-white p-4 text-left transition-colors hover:border-[#1a2b28]"
               >
                 <div className="text-sm font-bold">{poder.nombre}</div>
-                <p className="mt-1 text-xs text-[#4a625d]">{poder.texto}</p>
+                <p className="mt-1 text-sm text-[#4a625d]">{poder.texto}</p>
                 <div className="mt-3 border-t border-[#dde5e2] pt-3">
-                  <div className="text-xs font-bold text-[#a8443a]">{defecto.nombre}</div>
-                  <p className="mt-1 text-xs text-[#4a625d]">{defecto.texto}</p>
+                  <div className="text-sm font-bold text-[#93402f]">{defecto.nombre}</div>
+                  <p className="mt-1 text-sm text-[#4a625d]">{defecto.texto}</p>
                 </div>
               </button>
             );
           })}
         </div>
 
-        <p className="text-center text-xs text-[#8a9793]">
+        <p className="text-center text-sm text-[#5f6d69]">
           Vas a tener que despertarte igual.
         </p>
       </div>
@@ -1005,11 +1068,11 @@ function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
   const muerto = state.fase === "muerto";
   return (
     <section className={`space-y-5 border p-6 ${muerto ? "border-malo" : "border-agua"}`}>
-      <p className={`text-xs tracking-widest ${muerto ? "text-malo" : "text-agua"}`}>
+      <p className={`text-sm tracking-widest ${muerto ? "text-malo" : "text-agua"}`}>
         {muerto ? "NO SONÓ NINGÚN TIMBRE" : "SALISTE"}
       </p>
       <p className="text-sm leading-relaxed">{state.final}</p>
-      <div className="space-y-1 border-t border-dimmer pt-4 text-xs text-dim">
+      <div className="space-y-1 border-t border-dimmer pt-4 text-sm text-dim">
         <p>
           Llegaste al ciclo {state.ciclo} de {CICLOS}.
         </p>
@@ -1019,7 +1082,7 @@ function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
       </div>
       <button
         onClick={onRestart}
-        className="w-full bg-agua p-3 text-xs font-bold tracking-widest text-background hover:opacity-80"
+        className="w-full bg-agua p-3 text-sm font-bold tracking-widest text-background hover:opacity-80"
       >
         OTRA VEZ
       </button>
@@ -1050,7 +1113,7 @@ function Bitacora({ state }: { state: State }) {
       {state.log.slice(0, 4).map((e, i) => (
         <p
           key={`${i}-${e.texto}`}
-          className={`text-xs leading-relaxed ${COLOR[e.tipo]}`}
+          className={`text-sm leading-relaxed ${COLOR[e.tipo]}`}
           style={{ opacity: Math.max(0.3, 1 - i * 0.18) }}
         >
           {e.texto}

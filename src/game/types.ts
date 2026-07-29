@@ -169,6 +169,8 @@ export type State = {
   oferta: { poderId: string; defectoId: string }[];
   /** Un arma encontrada con la mochila llena: hay que elegir qué dejar. */
   armaOfrecida: string | null;
+  /** Lo que sacaste del aula, listado uno por uno con su cantidad. */
+  botin: { tipo: "item" | "arma" | "sombra" | "vida"; id: string; cantidad: number }[];
 
   log: Entrada[];
   final: string | null;
