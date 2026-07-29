@@ -46,11 +46,13 @@ export type Arma = {
   id: string;
   nombre: string;
   daño: number;
-  /** Se gasta. Es la razón por la que no la usás siempre. */
+  /** Usos por combate. Se recuperan en el próximo. */
   usos: number;
+  /** Las que no se gastan: menos daño, pero están siempre. */
+  infinita?: boolean;
   /** 0..1 con el arma entera. Cuanto más pega, menos acierta. */
   precision: number;
-  /** Cuánta precisión pierde por cada uso. El filo se va. */
+  /** Cuánta precisión pierde por cada uso, dentro de la pelea. */
   desgaste: number;
   /** Probabilidad de pegar el doble. */
   critico: number;
@@ -99,31 +101,26 @@ export type Combate = {
   paso: number;
   esperando: boolean;
   /**
-   * Todo lo que gastaste vive acá adentro y muere con el combate. El
-   * inventario del jugador nunca se toca: lo que tenés es una capacidad, lo
-   * gastado es una condición, y las condiciones no cruzan la puerta.
+   * Lo que se recarga en cada pelea: los usos de cada arma y de cada poder.
+   * Los items y las sombras no están acá porque esos sí se gastan de verdad,
+   * y decidir si los quemás ahora o los guardás es parte del juego.
    */
-  itemsUsados: string[];
+  armasUsadas: Record<string, number>;
   poderesUsados: Record<string, number>;
-  armaUsada: number;
-  /** Una sola por combate, por más cadáveres que lleves encima. */
-  sombrasUsadas: number;
 };
 
 export type Fase = "pasillo" | "combate" | "recompensa" | "sueño" | "muerto" | "fin";
 
-/**
- * Sólo capacidades. Nada de acá se consume peleando: los usos se recuperan
- * en cada combate. Lo único que cambia entre aulas es qué tenés, no cuánto
- * te queda.
- */
 export type Jugador = {
+  /** Lo único que se restaura solo en cada aula. */
   vida: number;
   vidaMax: number;
-  armaId: string | null;
-  /** Uno por cada ejemplar. Repetidos = más usos por combate. */
+  /** Hasta MAX_ARMAS. Cada una con sus usos por pelea. */
+  armas: string[];
+  /** Se consumen de verdad: guardarlos o quemarlos es una decisión. */
   items: string[];
   sombras: string[];
+  /** Capacidad permanente; los usos se recargan cada combate. */
   poderes: string[];
   defectos: string[];
 };
@@ -131,6 +128,13 @@ export type Jugador = {
 export type Entrada = {
   texto: string;
   tipo: "neutral" | "bueno" | "malo" | "sueño" | "enemigo";
+  /**
+   * Cómo quedaban las vidas justo después de este evento. La interfaz las usa
+   * para que las barras bajen en el mismo momento en que se lee el golpe, y
+   * no antes.
+   */
+  vidaJugador?: number;
+  vidaEnemigo?: number;
   /**
    * Quién lo hizo. La interfaz mete una pausa larga cuando el turno cambia de
    * manos, para que se lea como una secuencia y no como un bloque.
@@ -163,6 +167,8 @@ export type State = {
   cicloTerminado: boolean;
 
   oferta: { poderId: string; defectoId: string }[];
+  /** Un arma encontrada con la mochila llena: hay que elegir qué dejar. */
+  armaOfrecida: string | null;
 
   log: Entrada[];
   final: string | null;
@@ -173,4 +179,6 @@ export type Action =
   | { type: "combate"; accion: Accion; ref?: string }
   | { type: "seguir" }
   | { type: "aceptar-oferta"; index: number }
+  /** `dejar` null = descartar la que encontraste. */
+  | { type: "canjear-arma"; dejar: string | null }
   | { type: "reiniciar"; seed?: number };

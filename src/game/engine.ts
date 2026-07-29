@@ -62,47 +62,33 @@ export function factorMiedo(state: State): number {
   return tieneEfecto(state, "miedo") ? 1 - FALLA_POR_MIEDO : 1;
 }
 
-/** Sombras que podés gastar en este combate. Nunca más de una. */
-export const SOMBRAS_POR_COMBATE = 1;
+/** Cuántas armas entran en la mochila. Llenarla obliga a elegir. */
+export const MAX_ARMAS = 3;
 
-/** Usos que le quedan al arma en este combate. Se recuperan en el próximo. */
-export function usosArma(state: State): number {
-  const j = state.jugador;
-  if (!j.armaId) return 0;
-  return ARMAS[j.armaId].usos - (state.combate?.armaUsada ?? 0);
+/** Usos que le quedan a un arma en este combate. Se recargan en el próximo. */
+export function usosArma(state: State, armaId: string): number {
+  const arma = ARMAS[armaId];
+  if (arma.infinita) return Infinity;
+  return arma.usos - (state.combate?.armasUsadas[armaId] ?? 0);
 }
 
 /**
  * Precisión actual del arma: el filo se pierde dentro del combate y vuelve
  * entero en el siguiente. Es un arco de una pelea, no de una run.
  */
-export function precisionArma(state: State): number {
-  const j = state.jugador;
-  if (!j.armaId) return 0;
-  const arma = ARMAS[j.armaId];
-  const usados = state.combate?.armaUsada ?? 0;
+export function precisionArma(state: State, armaId: string): number {
+  const arma = ARMAS[armaId];
+  const usados = state.combate?.armasUsadas[armaId] ?? 0;
   return Math.max(PRECISION_MINIMA, arma.precision - usados * arma.desgaste);
 }
 
-/** Ejemplares de cada item que todavía no gastaste en este combate. */
-export function itemsDisponibles(state: State): string[] {
-  const usados = [...(state.combate?.itemsUsados ?? [])];
-  const libres: string[] = [];
-  for (const id of state.jugador.items) {
-    const i = usados.indexOf(id);
-    if (i === -1) libres.push(id);
-    else usados.splice(i, 1);
-  }
-  return libres;
+/** Las armas que podés usar ahora mismo. */
+export function armasUsables(state: State): string[] {
+  return state.jugador.armas.filter((id) => usosArma(state, id) > 0);
 }
 
 export function usosPoder(state: State, id: string): number {
   return PODERES[id].usos - (state.combate?.poderesUsados[id] ?? 0);
-}
-
-export function sombrasLibres(state: State): number {
-  if (state.jugador.sombras.length === 0) return 0;
-  return SOMBRAS_POR_COMBATE - (state.combate?.sombrasUsadas ?? 0);
 }
 const DURACION_EFECTO = 2;
 
@@ -156,6 +142,37 @@ function log(
   extra?: { icono?: Efecto; aviso?: boolean },
 ): Entrada[] {
   return [{ texto, tipo, actor, ...extra }, ...entradas].slice(0, 30);
+}
+
+/**
+ * Igual que log(), pero deja anotado cómo quedaron las vidas justo después
+ * del evento. Se llama SIEMPRE después de aplicar el cambio, para que la
+ * barra baje en el mismo momento en que se lee el golpe.
+ */
+function logEstado(
+  s: State,
+  texto: string,
+  tipo: Entrada["tipo"] = "neutral",
+  actor?: Entrada["actor"],
+  extra?: { icono?: Efecto; aviso?: boolean },
+): Entrada[] {
+  return [
+    {
+      texto,
+      tipo,
+      actor,
+      ...extra,
+      vidaJugador: s.jugador.vida,
+      vidaEnemigo: s.combate?.vida,
+    },
+    ...s.log,
+  ].slice(0, 30);
+}
+
+/** Le saca vida al enemigo dejando el estado listo para anotar el evento. */
+function dañar(s: State, d: number): State {
+  if (!s.combate) return s;
+  return { ...s, combate: { ...s.combate, vida: s.combate.vida - d } };
 }
 
 function aplicarDaño(state: State, base: number): number {
@@ -256,41 +273,41 @@ function turnoEnemigo(state: State, rng: Rng): State {
   /** Marca de agua: todo lo que se loguee de acá en más lo hizo el enemigo. */
   const tope = state.log[0];
 
-  let contra = 0;
   const acierta = random(rng) <= (intencion.precision ?? 0.85);
   /** Te cubriste: aunque no te toque, quedaste parado para devolver. */
   const devolver = () => {
     if (!c.esperando) return;
-    contra = aplicarDaño(s, DAÑO_CONTRA);
+    const d = aplicarDaño(s, DAÑO_CONTRA);
     if (random(rng) > PRECISION_CONTRA) {
-      contra = 0;
-      s = { ...s, log: log(s.log, "Tirás a devolver y no llegás.", "neutral") };
+      s = { ...s, log: logEstado(s, "Tirás a devolver y no llegás.", "neutral") };
     } else {
-      s = { ...s, log: log(s.log, `Se abrió. Le devolvés ${contra}.`, "bueno") };
+      s = dañar(s, d);
+      s = { ...s, log: logEstado(s, `Se abrió. Le devolvés ${d}.`, "bueno") };
     }
   };
 
   if (intencion.tipo === "golpe") {
     if (!acierta) {
-      s = { ...s, log: log(s.log, "Va hacia vos y pasa de largo.", "neutral") };
+      s = { ...s, log: logEstado(s, "Va hacia vos y pasa de largo.", "neutral") };
       devolver();
     } else {
-      // Primero qué hizo, después qué te costó: son dos eventos distintos y la
-      // interfaz los muestra uno después del otro.
+      // El impacto se cuenta primero y todavía no cuesta nada: el número, y
+      // con él la barra, llegan en el evento siguiente.
       let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
-      s = { ...s, log: log(s.log, intencion.impacto ?? "Te alcanza.", "enemigo") };
-      if (c.esperando) {
-        daño = Math.max(1, Math.round(daño * 0.2));
-        s = { ...s, log: log(s.log, `Lo viste venir: sólo −${daño}.`, "bueno") };
-        devolver();
-      } else {
-        s = { ...s, log: log(s.log, `De lleno. −${daño}.`, "malo") };
-      }
+      s = { ...s, log: logEstado(s, intencion.impacto ?? "Te alcanza.", "enemigo") };
+      if (c.esperando) daño = Math.max(1, Math.round(daño * 0.2));
       s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
+      s = {
+        ...s,
+        log: c.esperando
+          ? logEstado(s, `Lo viste venir: sólo −${daño}.`, "bueno")
+          : logEstado(s, `De lleno. −${daño}.`, "malo"),
+      };
+      if (c.esperando) devolver();
     }
   } else if (intencion.tipo === "efecto" && intencion.efecto) {
     if (!acierta) {
-      s = { ...s, log: log(s.log, "Lo intenta y no te agarra.", "neutral") };
+      s = { ...s, log: logEstado(s, "Lo intenta y no te agarra.", "neutral") };
     } else {
       const ef = intencion.efecto;
       const ya = s.efectos.some((x) => x.efecto === ef);
@@ -299,13 +316,13 @@ function turnoEnemigo(state: State, rng: Rng): State {
         efectos: ya
           ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
           : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
-        log: log(s.log, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef }),
       };
+      s = { ...s, log: logEstado(s, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef }) };
     }
   } else {
     // Un turno de espera igual es un turno: si no se muestra, el jugador ve
     // su acción y después el aviso, y parece que el enemigo se la saltó.
-    s = { ...s, log: log(s.log, "No hace nada. Todavía.", "neutral") };
+    s = { ...s, log: logEstado(s, "No hace nada. Todavía.", "neutral") };
   }
 
   // Todo lo agregado en este turno lleva la firma del enemigo.
@@ -317,12 +334,7 @@ function turnoEnemigo(state: State, rng: Rng): State {
   return {
     ...s,
     log: firmado,
-    combate: {
-      ...c,
-      vida: s.combate!.vida - contra,
-      paso: c.paso + 1,
-      esperando: false,
-    },
+    combate: { ...s.combate!, paso: c.paso + 1, esperando: false },
   };
 }
 
@@ -333,7 +345,7 @@ function cerrarTurno(state: State, rng: Rng): State {
     // pausa larga caiga antes de esta línea y no en el medio.
     s = {
       ...s,
-      log: log(s.log, "Todavía no terminaste de moverte.", "enemigo", "eso"),
+      log: logEstado(s, "Todavía no terminaste de moverte.", "enemigo", "eso"),
     };
     s = turnoEnemigo(s, rng);
   }
@@ -375,6 +387,7 @@ function ganarCombate(state: State, rng: Rng): State {
     sombras: [...state.jugador.sombras, enemigo.id],
   };
   let l = log(state.log, `${enemigo.nombre} deja de estar.`, "bueno");
+  let armaOfrecida: string | null = null;
 
   if (enemigo.profesor) {
     // Vencer a un profesor es la única progresión permanente que hay.
@@ -383,13 +396,20 @@ function ganarCombate(state: State, rng: Rng): State {
     l = log(l, "Aguantás un poco más que antes. +6 de vida máxima.", "bueno");
   } else if (materia && random(rng) < 0.45) {
     const armaId = pick(rng, materia.armas);
-    jugador = { ...jugador, armaId };
-    l = log(
-      l,
-      `Agarrás ${ARMAS[armaId].nombre}. ${ARMAS[armaId].usos} usos por pelea.`,
-      "bueno",
-    );
-  } else if (jugador.items.length < 5) {
+    const arma = ARMAS[armaId];
+    const cuenta = arma.infinita ? "no se gasta" : `${arma.usos} usos por pelea`;
+    if (jugador.armas.includes(armaId)) {
+      // Ya la tenías: no hay nada que elegir.
+      l = log(l, `Otra ${arma.nombre}. Dejás la que estaba.`, "neutral");
+    } else if (jugador.armas.length < MAX_ARMAS) {
+      jugador = { ...jugador, armas: [...jugador.armas, armaId] };
+      l = log(l, `Agarrás ${arma.nombre}. ${cuenta}.`, "bueno");
+    } else {
+      // Mochila llena: la decisión de qué dejar es del jugador.
+      armaOfrecida = armaId;
+      l = log(l, `Hay ${arma.nombre}. ${cuenta}. No te entra nada más.`, "neutral");
+    }
+  } else if (jugador.items.length < 6) {
     const itemId = pick(rng, ITEM_IDS);
     jugador = { ...jugador, items: [...jugador.items, itemId] };
     l = log(l, `Guardás ${ITEMS[itemId].nombre}.`, "bueno");
@@ -402,6 +422,7 @@ function ganarCombate(state: State, rng: Rng): State {
     efectos: [],
     fase: "recompensa",
     cicloTerminado: !!enemigo.profesor,
+    armaOfrecida,
     log: l,
   };
 }
@@ -413,7 +434,7 @@ export function initialState(seed: number = randomSeed()): State {
   const jugador: Jugador = {
     vida: VIDA_BASE,
     vidaMax: VIDA_BASE,
-    armaId: null,
+    armas: [],
     items: ["agua"],
     sombras: [],
     poderes: [],
@@ -430,6 +451,7 @@ export function initialState(seed: number = randomSeed()): State {
     deformacion: Object.fromEntries(MATERIA_IDS.map((m) => [m, 0])),
     cicloTerminado: false,
     oferta: [],
+    armaOfrecida: null,
     log: [{ texto: "Hace tres días que no dormís bien. Sonó el timbre.", tipo: "neutral" }],
     final: null,
   };
@@ -478,11 +500,9 @@ function apply(state: State, action: Action, rng: Rng): State {
           vidaMax: vidaEnemigo,
           paso: 0,
           esperando: false,
-          // Entrás con todo entero: el desgaste no cruza la puerta.
-          itemsUsados: [],
+          // Los usos de armas y poderes vuelven enteros en cada aula.
+          armasUsadas: {},
           poderesUsados: {},
-          armaUsada: 0,
-          sombrasUsadas: 0,
         },
         // Entrás, y lo primero que pasa es que ves qué va a hacer.
         log: log(
@@ -504,8 +524,36 @@ function apply(state: State, action: Action, rng: Rng): State {
     case "combate":
       return turnoDeCombate(state, action.accion, action.ref, rng);
 
+    case "canjear-arma": {
+      if (state.fase !== "recompensa" || !state.armaOfrecida) return state;
+      const nueva = state.armaOfrecida;
+      if (!action.dejar) {
+        return {
+          ...state,
+          armaOfrecida: null,
+          log: log(state.log, `Dejás ${ARMAS[nueva].nombre} donde estaba.`, "neutral"),
+        };
+      }
+      if (!state.jugador.armas.includes(action.dejar)) return state;
+      return {
+        ...state,
+        armaOfrecida: null,
+        jugador: {
+          ...state.jugador,
+          armas: state.jugador.armas.map((a) => (a === action.dejar ? nueva : a)),
+        },
+        log: log(
+          state.log,
+          `Soltás ${ARMAS[action.dejar].nombre} y te llevás ${ARMAS[nueva].nombre}.`,
+          "bueno",
+        ),
+      };
+    }
+
     case "seguir": {
       if (state.fase !== "recompensa") return state;
+      // No se sale del aula con un arma en la mano sin decidir.
+      if (state.armaOfrecida) return state;
       // Si lo que cayó era un profesor, se termina el ciclo y se duerme.
       return volverAlPasillo(state, rng, state.cicloTerminado);
     }
@@ -578,62 +626,79 @@ function turnoDeCombate(
     return cerrarTurno(s, rng);
   }
 
-  let vidaEnemigo = c.vida;
   let esperando = false;
 
   switch (accion) {
     case "atacar": {
       if (random(rng) > PRECISION_ATAQUE) {
-        s = { ...s, log: log(s.log, "Tirás el brazo y no está donde creías.", "malo") };
+        s = { ...s, log: logEstado(s, "Tirás el brazo y no está donde creías.", "malo") };
         break;
       }
       const d = aplicarDaño(s, DAÑO_ATAQUE);
-      vidaEnemigo -= d;
-      s = { ...s, log: log(s.log, `Le pegás. ${d}.`, "neutral") };
+      s = dañar(s, d);
+      s = { ...s, log: logEstado(s, `Le pegás. ${d}.`, "neutral") };
       break;
     }
     case "esperar": {
       esperando = true;
-      s = { ...s, log: log(s.log, "Te cubrís y esperás.", "neutral") };
+      s = { ...s, log: logEstado(s, "Te cubrís y esperás.", "neutral") };
       break;
     }
     case "arma": {
-      if (!s.jugador.armaId || usosArma(s) <= 0) return s;
-      const arma = ARMAS[s.jugador.armaId];
+      const armaId = ref ?? s.jugador.armas[0];
+      if (!armaId || !s.jugador.armas.includes(armaId)) return s;
+      if (usosArma(s, armaId) <= 0) return s;
+      const arma = ARMAS[armaId];
       // El uso se gasta aciertes o no. Y se recupera al salir del aula.
-      const acierta = random(rng) <= precisionArma(s);
+      const acierta = random(rng) <= precisionArma(s, armaId);
       const critico = acierta && random(rng) <= arma.critico;
-
-      let texto: string;
-      let tono: Entrada["tipo"];
-      if (!acierta) {
-        texto = `${arma.nombre} pasa al lado.`;
-        tono = "malo";
-      } else {
-        const d = aplicarDaño(s, critico ? arma.daño * 2 : arma.daño);
-        vidaEnemigo -= d;
-        texto = critico ? `${arma.texto} Justo ahí. ${d}.` : `${arma.texto} ${d}.`;
-        tono = "bueno";
-      }
 
       s = {
         ...s,
-        combate: { ...s.combate!, armaUsada: s.combate!.armaUsada + 1 },
-        log: log(s.log, texto, tono),
+        combate: {
+          ...s.combate!,
+          armasUsadas: {
+            ...s.combate!.armasUsadas,
+            [armaId]: (s.combate!.armasUsadas[armaId] ?? 0) + 1,
+          },
+        },
       };
+
+      if (!acierta) {
+        s = { ...s, log: logEstado(s, `${arma.nombre} pasa al lado.`, "malo") };
+      } else {
+        const d = aplicarDaño(s, critico ? arma.daño * 2 : arma.daño);
+        s = dañar(s, d);
+        s = {
+          ...s,
+          log: logEstado(
+            s,
+            critico ? `${arma.texto} Justo ahí. ${d}.` : `${arma.texto} ${d}.`,
+            "bueno",
+          ),
+        };
+      }
       break;
     }
     case "usar": {
       if (!ref) return s;
 
+      // Las sombras se gastan de verdad: son trofeos, no munición.
       if (ref.startsWith("sombra:")) {
         const id = ref.slice(7);
-        if (!s.jugador.sombras.includes(id) || sombrasLibres(s) <= 0) return s;
+        const i = s.jugador.sombras.indexOf(id);
+        if (i === -1) return s;
         s = {
           ...s,
-          combate: { ...s.combate!, sombrasUsadas: s.combate!.sombrasUsadas + 1 },
+          jugador: {
+            ...s.jugador,
+            sombras: s.jugador.sombras.filter((_, k) => k !== i),
+          },
           efectos: [],
-          log: log(s.log, `La sombra de ${ENEMIGOS[id].nombre} se interpone.`, "bueno"),
+        };
+        s = {
+          ...s,
+          log: logEstado(s, `La sombra de ${ENEMIGOS[id].nombre} se interpone.`, "bueno"),
         };
         break;
       }
@@ -643,64 +708,65 @@ function turnoDeCombate(
         if (!s.jugador.poderes.includes(id) || usosPoder(s, id) <= 0) return s;
         const poder = PODERES[id];
         // El uso se gasta salga o no; vuelve entero en el próximo combate.
-        const gastado = {
-          ...s.combate!,
-          poderesUsados: {
-            ...s.combate!.poderesUsados,
-            [id]: (s.combate!.poderesUsados[id] ?? 0) + 1,
+        s = {
+          ...s,
+          combate: {
+            ...s.combate!,
+            poderesUsados: {
+              ...s.combate!.poderesUsados,
+              [id]: (s.combate!.poderesUsados[id] ?? 0) + 1,
+            },
           },
         };
         if (random(rng) > poder.precision) {
-          s = {
-            ...s,
-            combate: gastado,
-            log: log(s.log, `${poder.nombre} no llega a agarrar.`, "malo"),
-          };
+          s = { ...s, log: logEstado(s, `${poder.nombre} no llega a agarrar.`, "malo") };
           break;
         }
-        let j = s.jugador;
-        if (poder.efecto.daño) vidaEnemigo -= aplicarDaño(s, poder.efecto.daño);
-        if (poder.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + poder.efecto.vida) };
-        s = {
-          ...s,
-          jugador: j,
-          combate: gastado,
-          efectos: poder.efecto.limpia ? [] : s.efectos,
-          log: log(s.log, `${poder.nombre}.`, "sueño"),
-        };
+        if (poder.efecto.daño) s = dañar(s, aplicarDaño(s, poder.efecto.daño));
+        if (poder.efecto.vida) {
+          s = {
+            ...s,
+            jugador: {
+              ...s.jugador,
+              vida: Math.min(s.jugador.vidaMax, s.jugador.vida + poder.efecto.vida),
+            },
+          };
+        }
+        if (poder.efecto.limpia) s = { ...s, efectos: [] };
+        s = { ...s, log: logEstado(s, `${poder.nombre}.`, "sueño") };
         break;
       }
 
-      if (!itemsDisponibles(s).includes(ref)) return s;
+      // Los items se consumen para siempre: guardarlos o quemarlos ahora es
+      // media estrategia del juego.
+      const idx = s.jugador.items.indexOf(ref);
+      if (idx === -1) return s;
       const item = ITEMS[ref];
-      // Se gasta igual: temblar y que se te caiga también cuenta como usarlo.
-      const gastado = {
-        ...s.combate!,
-        itemsUsados: [...s.combate!.itemsUsados, ref],
-      };
-      if (random(rng) > item.precision) {
-        s = {
-          ...s,
-          combate: gastado,
-          log: log(s.log, `${item.nombre} se te escapa de la mano.`, "malo"),
-        };
-        break;
-      }
-      let j = s.jugador;
-      if (item.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + item.efecto.vida) };
-      if (item.efecto.daño) vidaEnemigo -= aplicarDaño(s, item.efecto.daño);
       s = {
         ...s,
-        jugador: j,
-        combate: gastado,
-        efectos: item.efecto.limpia ? [] : s.efectos,
-        log: log(s.log, `Usás ${item.nombre}.`, "bueno"),
+        jugador: { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) },
       };
+      if (random(rng) > item.precision) {
+        s = { ...s, log: logEstado(s, `${item.nombre} se te escapa de la mano.`, "malo") };
+        break;
+      }
+      if (item.efecto.vida) {
+        s = {
+          ...s,
+          jugador: {
+            ...s.jugador,
+            vida: Math.min(s.jugador.vidaMax, s.jugador.vida + item.efecto.vida),
+          },
+        };
+      }
+      if (item.efecto.daño) s = dañar(s, aplicarDaño(s, item.efecto.daño));
+      if (item.efecto.limpia) s = { ...s, efectos: [] };
+      s = { ...s, log: logEstado(s, `Usás ${item.nombre}.`, "bueno") };
       break;
     }
   }
 
-  s = { ...s, combate: { ...s.combate!, vida: vidaEnemigo, esperando } };
-  if (vidaEnemigo <= 0) return ganarCombate(s, rng);
+  s = { ...s, combate: { ...s.combate!, esperando } };
+  if (s.combate!.vida <= 0) return ganarCombate(s, rng);
   return cerrarTurno(s, rng);
 }

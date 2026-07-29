@@ -7,15 +7,15 @@ import {
   confundido,
   DAÑO_ATAQUE,
   DAÑO_CONTRA,
+  armasUsables,
   factorMiedo,
   initialState,
-  itemsDisponibles,
+  MAX_ARMAS,
   nombreDe,
   PRECISION_ATAQUE,
   precisionArma,
   puedeHuir,
   reduce,
-  sombrasLibres,
   usosArma,
   usosPoder,
 } from "@/game/engine";
@@ -34,7 +34,7 @@ import {
 } from "@/game/mundo";
 import { DEFECTOS, PODERES } from "@/game/poderes";
 import { ICONOS, ICONOS_EFECTO, SPRITES } from "@/game/sprites";
-import type { Accion, Action, Entrada, State } from "@/game/types";
+import type { Accion, Action, Entrada, Intencion, State } from "@/game/types";
 
 /** Cuánto dura un evento común en pantalla. */
 const RITMO = 700;
@@ -94,7 +94,9 @@ export default function Juego() {
     <>
       {evento}
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
-        {state.fase !== "sueño" && <Cabecera state={state} />}
+        {state.fase !== "sueño" && (
+          <Cabecera state={state} vidaMostrada={actual?.vidaJugador} />
+        )}
         {state.fase === "combate" && (
           <Combate
             state={state}
@@ -514,9 +516,16 @@ const NOMBRE_EFECTO: Record<string, string> = {
   torpeza: "TORPEZA",
 };
 
-function Cabecera({ state }: { state: State }) {
+/** Cuántos usos mostrar de un arma: ∞ para las que no se gastan. */
+function usosTexto(state: State, id: string): string {
+  if (ARMAS[id].infinita) return "∞";
+  return String(state.combate ? usosArma(state, id) : ARMAS[id].usos);
+}
+
+function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number }) {
   const j = state.jugador;
   const c = confundido(state);
+  const vida = vidaMostrada ?? j.vida;
   return (
     <header className="space-y-2">
       <div className="flex items-baseline justify-between text-xs tracking-widest text-dim">
@@ -524,15 +533,15 @@ function Cabecera({ state }: { state: State }) {
           CICLO {state.ciclo}/{CICLOS}
         </span>
         <span>
-          {j.armaId
-            ? `${ARMAS[j.armaId].nombre} ×${state.combate ? usosArma(state) : ARMAS[j.armaId].usos}`
-            : "sin arma"}
+          {j.armas.length
+            ? j.armas.map((id) => `${ARMAS[id].nombre} ×${usosTexto(state, id)}`).join(" · ")
+            : "con las manos"}
         </span>
       </div>
-      <Barra valor={j.vida} max={j.vidaMax} />
+      <Barra valor={vida} max={j.vidaMax} />
       <div className="flex justify-between text-xs text-dim">
         <span className="tabular-nums">
-          {num(j.vida, c)}/{num(j.vidaMax, c)}
+          {num(vida, c)}/{num(j.vidaMax, c)}
         </span>
         <span>{j.items.length + j.sombras.length} en el bolsillo</span>
       </div>
@@ -629,8 +638,26 @@ function EventoEfecto({ entrada, k }: { entrada: Entrada; k: number }) {
   );
 }
 
+/** El detalle numérico de lo que el enemigo va a intentar. */
+function numerosDe(i: Intencion): string {
+  const prob = `${Math.round((i.precision ?? 0.85) * 100)}% de acertar`;
+  if (i.tipo === "golpe") return `golpe de ~${Math.round((i.daño ?? 0) * 1.15)} · ${prob}`;
+  if (i.tipo === "efecto") {
+    return `te deja ${(NOMBRE_EFECTO[i.efecto ?? ""] ?? "").toLowerCase()} · ${prob}`;
+  }
+  return "no hace nada este turno";
+}
+
 /** Un evento por vez, en el lugar donde vive el combate. */
-function EventoEnLinea({ entrada, k }: { entrada: Entrada; k: number }) {
+function EventoEnLinea({
+  entrada,
+  k,
+  numeros,
+}: {
+  entrada: Entrada;
+  k: number;
+  numeros?: string;
+}) {
   return (
     <div
       key={`${k}-${entrada.texto}`}
@@ -648,6 +675,8 @@ function EventoEnLinea({ entrada, k }: { entrada: Entrada; k: number }) {
       <p className={`text-base leading-snug ${COLOR_FUERTE[entrada.tipo]}`}>
         {entrada.texto}
       </p>
+      {/* El número va pegado abajo del texto que lo describe en abstracto. */}
+      {entrada.aviso && numeros && <p className="text-xs text-dim">{numeros}</p>}
     </div>
   );
 }
@@ -667,28 +696,33 @@ function Combate({
   actual: Entrada | null;
   restantes: number;
 }) {
-  const [menu, setMenu] = useState(false);
+  const [menu, setMenu] = useState<"usar" | "armas" | null>(null);
   const [golpe, setGolpe] = useState(0);
   const vidaEnemigoPrev = useRef<number | null>(null);
   const vidaPrev = useRef(state.jugador.vida);
   const [herido, setHerido] = useState(0);
 
   const c = state.combate;
-  const vidaEnemigo = c?.vida ?? null;
+  // Se sigue el valor que se está mostrando, no el final: así la sacudida cae
+  // en el mismo evento en que baja la barra.
+  const vidaEnemigoVista = actual?.vidaEnemigo ?? c?.vida ?? null;
 
   // Sacudida del enemigo cuando le entra, y del borde cuando te entra a vos.
   useEffect(() => {
+    const vidaEnemigo = vidaEnemigoVista;
     if (vidaEnemigo === null) return;
     if (vidaEnemigoPrev.current !== null && vidaEnemigo < vidaEnemigoPrev.current) {
       setGolpe((g) => g + 1);
     }
     vidaEnemigoPrev.current = vidaEnemigo;
-  }, [vidaEnemigo]);
+  }, [vidaEnemigoVista]);
 
+  // Lo mismo del lado tuyo: el destello va con el evento, no con el estado.
+  const vidaJugadorVista = actual?.vidaJugador ?? state.jugador.vida;
   useEffect(() => {
-    if (state.jugador.vida < vidaPrev.current) setHerido((h) => h + 1);
-    vidaPrev.current = state.jugador.vida;
-  }, [state.jugador.vida]);
+    if (vidaJugadorVista < vidaPrev.current) setHerido((h) => h + 1);
+    vidaPrev.current = vidaJugadorVista;
+  }, [vidaJugadorVista]);
 
   if (!c) return null;
   const enemigo = ENEMIGOS[c.enemigoId];
@@ -701,26 +735,25 @@ function Combate({
 
   const act = (accion: Accion, ref?: string) => {
     if (contando) return;
-    setMenu(false);
+    setMenu(null);
     dispatch({ type: "combate", accion, ref });
   };
 
-  // Todo lo que se puede usar en este combate. Los usos vuelven en el próximo.
+  const vidaEnemigo = vidaEnemigoVista ?? c.vida;
+
   const guardado = [
-    ...itemsDisponibles(state).map((id, i) => ({
+    ...j.items.map((id, i) => ({
       ref: id,
       key: `i${i}`,
       texto: `${ITEMS[id].nombre} · ${pct(ITEMS[id].precision)}% — ${ITEMS[id].descripcion}`,
       clase: "text-dim",
     })),
-    ...(sombrasLibres(state) > 0
-      ? j.sombras.map((id, i) => ({
-          ref: `sombra:${id}`,
-          key: `s${i}`,
-          texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`,
-          clase: "text-sueno",
-        }))
-      : []),
+    ...j.sombras.map((id, i) => ({
+      ref: `sombra:${id}`,
+      key: `s${i}`,
+      texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`,
+      clase: "text-sueno",
+    })),
     ...j.poderes
       .filter((id) => usosPoder(state, id) > 0)
       .map((id) => ({
@@ -730,6 +763,8 @@ function Combate({
         clase: "text-agua",
       })),
   ];
+
+  const usables = armasUsables(state);
 
   return (
     <section className="space-y-4">
@@ -752,37 +787,22 @@ function Combate({
         </div>
         <p className="text-center text-sm">{enemigo.nombre}</p>
         <div className="w-full space-y-1">
-          <Barra valor={c.vida} max={c.vidaMax} color="bg-malo" />
+          <Barra valor={vidaEnemigo} max={c.vidaMax} color="bg-malo" />
           <div className="text-right text-xs tabular-nums text-dim">
-            {num(c.vida, conf)}/{num(c.vidaMax, conf)}
+            {num(vidaEnemigo, conf)}/{num(c.vidaMax, conf)}
           </div>
-        </div>
-        {/* Lo que viene, en números: sin información escondida no hay decisión.
-            El aviso en palabras vive abajo, donde se lee la secuencia. */}
-        <div className="flex w-full justify-center gap-3 border-t border-dimmer pt-3 text-xs text-dim">
-          <span>
-            {intencion.tipo === "golpe"
-              ? `golpe ~${Math.round((intencion.daño ?? 0) * 1.15)}`
-              : intencion.tipo === "efecto"
-                ? `te agarra ${NOMBRE_EFECTO[intencion.efecto ?? ""] ?? ""}`
-                : "no hace nada"}
-          </span>
-          {intencion.tipo !== "espera" && (
-            <span className="tabular-nums">
-              {Math.round((intencion.precision ?? 0.85) * 100)}% de acertar
-            </span>
-          )}
         </div>
       </div>
 
       {/* Un evento por vez, arriba de los botones. Cuando no pasa nada, el
           aviso vigente queda a la vista para poder decidir. */}
       {actual && !actual.icono ? (
-        <EventoEnLinea entrada={actual} k={restantes} />
+        <EventoEnLinea entrada={actual} k={restantes} numeros={numerosDe(intencion)} />
       ) : (
         <div className="flex min-h-20 flex-col justify-center gap-1.5 border-l-2 border-agua px-4 py-3">
           <span className="text-[10px] tracking-[0.4em] text-dim">VA A HACER</span>
           <p className="text-base leading-snug text-agua">{intencion.tell}</p>
+          <p className="text-xs text-dim">{numerosDe(intencion)}</p>
         </div>
       )}
 
@@ -798,24 +818,36 @@ function Combate({
           onClick={() => act("esperar")}
         />
         <Boton
-          label={j.armaId ? ARMAS[j.armaId].nombre.toUpperCase() : "SIN ARMA"}
-          sub={
-            j.armaId
-              ? `${ARMAS[j.armaId].daño} · ${pct(precisionArma(state))}% · ×${usosArma(state)}`
-              : "—"
-          }
-          disabled={!j.armaId || usosArma(state) <= 0}
-          onClick={() => act("arma")}
+          label={usables.length ? "ARMA" : "SIN ARMA"}
+          sub={usables.length ? `${usables.length} a mano` : "—"}
+          disabled={usables.length === 0}
+          onClick={() => setMenu(menu === "armas" ? null : "armas")}
         />
         <Boton
           label="USAR"
           sub={`${guardado.length}`}
           disabled={guardado.length === 0}
-          onClick={() => setMenu(!menu)}
+          onClick={() => setMenu(menu === "usar" ? null : "usar")}
         />
       </div>
 
-      {menu && !contando && (
+      {menu === "armas" && !contando && (
+        <div className="space-y-1 border border-dimmer p-3">
+          {usables.map((id) => (
+            <button
+              key={id}
+              onClick={() => act("arma", id)}
+              className="block w-full text-left text-xs text-foreground hover:text-agua"
+            >
+              {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
+              {pct(precisionArma(state, id))}% · {usosTexto(state, id)} usos
+              {ARMAS[id].critico > 0 && ` · ${Math.round(ARMAS[id].critico * 100)}% crítico`}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {menu === "usar" && !contando && (
         <div className="space-y-1 border border-dimmer p-3">
           {guardado.map((g) => (
             <button
@@ -872,6 +904,7 @@ function Recompensa({
   dispatch: (a: Action) => void;
   contando: boolean;
 }) {
+  const nueva = state.armaOfrecida;
   return (
     <section className="space-y-4 border border-agua-hondo p-5">
       <p className="text-xs tracking-widest text-agua">
@@ -882,13 +915,43 @@ function Recompensa({
           {e.texto}
         </p>
       ))}
-      <button
-        onClick={() => dispatch({ type: "seguir" })}
-        disabled={contando}
-        className="w-full bg-agua p-3 text-xs font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
-      >
-        {state.cicloTerminado ? "DORMIR" : "VOLVER AL PASILLO"}
-      </button>
+
+      {/* Mochila llena: no se sale del aula sin decidir qué se deja. */}
+      {nueva ? (
+        <div className="space-y-2 border-t border-dimmer pt-4">
+          <p className="text-xs text-dim">
+            Llevás {MAX_ARMAS}. Para agarrar {ARMAS[nueva].nombre} ({ARMAS[nueva].daño} de
+            daño · {Math.round(ARMAS[nueva].precision * 100)}% ·{" "}
+            {ARMAS[nueva].infinita ? "no se gasta" : `${ARMAS[nueva].usos} usos`}) tenés
+            que soltar algo.
+          </p>
+          {state.jugador.armas.map((id) => (
+            <button
+              key={id}
+              onClick={() => dispatch({ type: "canjear-arma", dejar: id })}
+              className="block w-full border border-dimmer p-2 text-left text-xs hover:border-agua"
+            >
+              soltar {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
+              {Math.round(ARMAS[id].precision * 100)}% ·{" "}
+              {ARMAS[id].infinita ? "no se gasta" : `${ARMAS[id].usos} usos`}
+            </button>
+          ))}
+          <button
+            onClick={() => dispatch({ type: "canjear-arma", dejar: null })}
+            className="block w-full border border-dimmer p-2 text-left text-xs text-dim hover:border-dim"
+          >
+            dejarla donde está
+          </button>
+        </div>
+      ) : (
+        <button
+          onClick={() => dispatch({ type: "seguir" })}
+          disabled={contando}
+          className="w-full bg-agua p-3 text-xs font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
+        >
+          {state.cicloTerminado ? "DORMIR" : "VOLVER AL PASILLO"}
+        </button>
+      )}
     </section>
   );
 }

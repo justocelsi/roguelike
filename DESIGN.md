@@ -42,29 +42,33 @@ casi hermoso. Lo que da miedo no es dormirse: es despertarse.
 
 ---
 
-## El principio: capacidades persisten, condiciones se restauran
+## Los tres recursos
 
-Todo el modelo de recursos sale de una sola regla:
+Lo único que se restaura solo es **la vida**: entrás entero a cada aula, así
+que ninguna pelea se pierde por lo que pasó en la anterior. Lo demás se
+reparte en tres capas que se sienten distintas a propósito:
 
-> **Entre combates persiste lo que *tenés*. Se restaura lo que *gastaste*.**
+| | Qué es | Cuándo se recarga |
+|---|---|---|
+| **Vida** | tu condición | en cada aula, siempre |
+| **Armas y poderes** | tu kit fijo | los usos, en cada pelea |
+| **Items y sombras** | tu reserva escasa | nunca: se gastan de verdad |
 
-Lo que tenés —el arma, los items, los poderes, las sombras— es una
-**capacidad** y te acompaña toda la run. Lo gastado —vida, usos, filo del
-arma, efectos— es una **condición**, vive adentro del combate y muere con él.
-Nada de eso cruza la puerta del aula.
+El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemás
+ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
+sostiene la estrategia larga de la run.
 
-Consecuencias, todas verificadas con invariantes automáticas:
+Verificado con 10 invariantes automáticas sobre 1500 partidas.
 
-- Entrás a cada aula **entero y con todo cargado**.
-- Las armas **no se rompen**: tienen usos *por pelea*.
-- Los poderes son **habilidades por combate**, no un recurso de la run.
-- Los items no se consumen para siempre: repetidos = más usos por pelea.
-- Las sombras se cargan igual, pero **sólo se puede gastar una por combate**
-  (si no, con quince encima los efectos dejarían de existir).
+### Armas
 
-En este colegio nada de lo que llevás se termina. El único que se gasta sos
-vos, y eso se arregla cuando salís del aula. **El único costo de pelear es el
-riesgo de morir.**
+Hasta **3 a la vez**. Cada una con sus usos por pelea, su precisión, su
+desgaste dentro del combate y su chance de crítico. Hay armas **infinitas**
+—la pelota, el puntero— que pegan menos pero están siempre: son el piso de tu
+daño. Las de usos contados son picos que hay que elegir cuándo gastar.
+
+Con la mochila llena, encontrar una cuarta obliga a soltar una. No se sale del
+aula sin decidir.
 
 ## Combate
 
@@ -169,24 +173,30 @@ Verificado con bots sobre miles de partidas:
 Los enemigos escalan por ciclo (vida +10%, daño +4%) para que el ciclo 5 no sea
 más blando que el 1.
 
-### La decisión del pasillo, medida
+### Cuántas formas de jugar son viables
 
-Con nada que se gaste entre aulas, el único costo de pelear es el riesgo de
-morir — así que hay que verificar que limpiar el pasillo siga valiendo la pena:
+La pregunta no es cuál estrategia es la correcta —eso lleva a un juego con una
+sola línea óptima— sino **cuántas maneras distintas de encarar la run
+sobreviven en una banda parecida**:
 
-| Estrategia | Muertes | Items | Con arma |
-|---|---|---|---|
-| Limpia el pasillo | 58,8% | 4,9 | 97% |
-| Va derecho al profesor | 71,2% | 1,0 | 0% |
+| Estilo | Muertes |
+|---|---|
+| Limpia todo, guarda los items para el profesor | 44,0% |
+| Limpia todo a lo bruto, el arma que más pegue | 45,1% |
+| Limpia la mitad del pasillo | 46,3% |
+| Limpia todo, quema items apenas baja la vida | 49,2% |
+| Va derecho al profesor | 65,9% |
 
-La primera vez que se midió esto el resultado estaba **invertido**: saltearse
-las aulas era más seguro, porque el botín no cambiaba nada. La causa no era que
-las aulas fueran peligrosas —18 peleas sumaban 2,5 puntos de muerte— sino que
-el ataque a mano limpia era demasiado bueno y el arma aportaba apenas el 15% del
-daño de una pelea. Bajar el puño de 12 a 6 es lo que hizo existir la decisión.
+Cuatro estilos distintos caen entre 44% y 49%. El único claramente peor es
+saltearse el pasillo entero, que es lo correcto: renunciar a todo el equipo
+tiene que costar. Y *cuánto* explorar sigue abierto — media pasada compite con
+la pasada completa.
 
-Subir la vida de los profesores no servía: endurecía todo sin cambiar cuál
-estrategia convenía.
+Que esto funcione depende de un número: **el ataque a mano limpia hace 6**. La
+primera vez que se midió, con el puño en 12, la relación estaba invertida y
+saltearse las aulas era lo óptimo, porque el botín no cambiaba nada. Subir la
+vida de los profesores no arreglaba nada: endurecía todo sin mover cuál estilo
+convenía.
 
 ---
 

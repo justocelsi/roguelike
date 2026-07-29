@@ -279,15 +279,19 @@ export const PROFESORES = Object.keys(ENEMIGOS).filter(
   (id) => ENEMIGOS[id].profesor,
 );
 
+/**
+ * Las infinitas pegan poco pero están siempre: son el piso de tu daño. Las de
+ * usos contados son picos que hay que elegir cuándo gastar dentro de la pelea.
+ */
 export const ARMAS: Record<string, Arma> = {
   regla: { id: "regla", nombre: "la regla", daño: 14, usos: 5, precision: 0.9, desgaste: 0.04, critico: 0.1, texto: "Medís y cortás." },
   compas: { id: "compas", nombre: "el compás", daño: 18, usos: 4, precision: 0.8, desgaste: 0.05, critico: 0.15, texto: "La punta entra donde tiene que entrar." },
   diccionario: { id: "diccionario", nombre: "el diccionario", daño: 15, usos: 5, precision: 0.86, desgaste: 0.03, critico: 0.06, texto: "Pesa más de lo que debería." },
-  puntero: { id: "puntero", nombre: "el puntero", daño: 16, usos: 5, precision: 0.85, desgaste: 0.04, critico: 0.1, texto: "Señalás y lo que señalás retrocede." },
+  puntero: { id: "puntero", nombre: "el puntero", daño: 16, usos: 0, infinita: true, precision: 0.85, desgaste: 0, critico: 0.1, texto: "Señalás y lo que señalás retrocede." },
   bisturi: { id: "bisturi", nombre: "el bisturí", daño: 22, usos: 3, precision: 0.7, desgaste: 0.07, critico: 0.25, texto: "Abrís sin resistencia." },
   mechero: { id: "mechero", nombre: "el mechero", daño: 17, usos: 4, precision: 0.8, desgaste: 0.06, critico: 0.15, texto: "La llama se estira hacia lo que mirás." },
   acido: { id: "acido", nombre: "el ácido", daño: 25, usos: 2, precision: 0.65, desgaste: 0.09, critico: 0.22, texto: "Lo que toca deja de tener forma." },
-  pelota: { id: "pelota", nombre: "la pelota", daño: 12, usos: 7, precision: 0.95, desgaste: 0.02, critico: 0.05, texto: "Pega y vuelve a tu mano." },
+  pelota: { id: "pelota", nombre: "la pelota", daño: 12, usos: 0, infinita: true, precision: 0.95, desgaste: 0, critico: 0.05, texto: "Pega y vuelve a tu mano." },
 };
 
 export const ITEMS: Record<string, Item> = {
