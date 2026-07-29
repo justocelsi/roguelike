@@ -105,6 +105,13 @@ export const DEFECTOS: Record<string, Defecto> = {
     texto: "El pasillo se angosta. Hay dos aulas menos antes del profesor.",
     menosPuertas: true,
   },
+  sin_aviso: {
+    id: "sin_aviso",
+    nombre: "Sin aviso",
+    texto:
+      "Dejás de ver lo que el otro va a hacer. Ya no lo leés: lo adivinás.",
+    sinAviso: true,
+  },
   resaca: {
     id: "resaca",
     nombre: "Resaca",

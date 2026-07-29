@@ -103,6 +103,11 @@ export type Defecto = {
   sinHuida?: boolean;
   menosPuertas?: boolean;
   efectosLargos?: boolean;
+  /**
+   * Te tapa el aviso del enemigo. No resta un número: te saca la información
+   * sobre la que está construido todo el combate.
+   */
+  sinAviso?: boolean;
 };
 
 // --- estado ---------------------------------------------------------------

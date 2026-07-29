@@ -131,6 +131,29 @@ vuelta: 58,8% limpiando contra 71,2% corriendo al fondo.
 > **Este es el número más delicado del juego.** Si se toca `DAÑO_ATAQUE`, hay
 > que volver a medir limpiar-contra-correr antes de darlo por bueno.
 
+### Sin aviso: el defecto que quita información en vez de restar
+
+Tomado del Runic Dome de Slay the Spire. Todos los defectos anteriores eran
+numéricos —25% menos de daño, 35% más recibido— y ese castigo se siente como
+una resta. Éste tapa el aviso del enemigo, que es la información sobre la que
+está construido todo el combate.
+
+**Medición del efecto por estilo**, con el defecto en el pool:
+
+| Estilo | Sin él | Con él |
+|---|---|---|
+| Luchador, nunca lee el aviso | 53,6% | 51,1% |
+| Calculador, su ventaja es leer | 51,6% | 58,6% |
+| Pasivo, bloquea al ver el golpe | 56,5% | 61,5% |
+
+Castiga exactamente a quien depende de leer y deja intacto a quien nunca leyó.
+La banda se ensancha de 5 a 10 puntos, y eso es deseable: tomarlo debería
+empujarte a cambiar de estilo, no sólo a jugar peor.
+
+**Nota para medir:** los bots leen el patrón del enemigo desde los datos, no
+desde la pantalla. Para que la medición fuera honesta hubo que hacerlos
+consultar `veElAviso()` y apostar a ciegas cuando corresponde.
+
 ### Progresión de daño del jugador
 
 **Problema.** Los enemigos escalan por ciclo pero el jugador no: sus números se

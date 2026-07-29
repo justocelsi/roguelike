@@ -9,6 +9,7 @@ import {
   bloqueoDe,
   armasUsables,
   factorMiedo,
+  veElAviso,
   initialState,
   MAX_ARMAS,
   nombreDe,
@@ -824,10 +825,13 @@ function EventoEnLinea({
   entrada,
   k,
   numeros,
+  ciego,
 }: {
   entrada: Entrada;
   k: number;
   numeros?: string;
+  /** Con el aviso tapado, la línea del enemigo decidiendo no dice qué eligió. */
+  ciego?: boolean;
 }) {
   return (
     <div
@@ -843,8 +847,12 @@ function EventoEnLinea({
             ? "VOS"
             : "ESO"}
       </span>
-      <p className={`text-base leading-snug ${COLOR_FUERTE[entrada.tipo]}`}>
-        {entrada.texto}
+      <p
+        className={`text-base leading-snug ${
+          entrada.aviso && ciego ? "text-sueno" : COLOR_FUERTE[entrada.tipo]
+        }`}
+      >
+        {entrada.aviso && ciego ? "Se decide, pero no llegás a ver qué." : entrada.texto}
       </p>
       {/* El número va pegado abajo del texto que lo describe en abstracto. */}
       {entrada.aviso && numeros && <p className="text-sm text-dim">{numeros}</p>}
@@ -901,6 +909,7 @@ function Combate({
   const conf = confundido(state);
   const j = state.jugador;
   // Con miedo encima, lo que vale es el producto de las dos tiradas.
+  const ciego = !veElAviso(state);
   const miedo = factorMiedo(state);
   const pct = (p: number) => Math.round(p * miedo * 100);
 
@@ -970,12 +979,31 @@ function Combate({
       {/* Un evento por vez, arriba de los botones. Cuando no pasa nada, el
           aviso vigente queda a la vista para poder decidir. */}
       {actual && !actual.icono ? (
-        <EventoEnLinea entrada={actual} k={restantes} numeros={numerosDe(intencion)} />
+        <EventoEnLinea
+          entrada={actual}
+          k={restantes}
+          numeros={ciego ? undefined : numerosDe(intencion)}
+          ciego={ciego}
+        />
       ) : (
-        <div className="flex min-h-18 shrink-0 flex-col justify-center gap-1 border-l-2 border-agua px-4 py-2.5">
-          <span className="text-xs tracking-[0.35em] text-dim">VA A HACER</span>
-          <p className="text-base leading-snug text-agua">{intencion.tell}</p>
-          <p className="text-sm text-dim">{numerosDe(intencion)}</p>
+        <div
+          className={`flex min-h-18 shrink-0 flex-col justify-center gap-1 border-l-2 px-4 py-2.5 ${
+            ciego ? "border-sueno" : "border-agua"
+          }`}
+        >
+          <span className="text-xs tracking-[0.35em] text-dim">
+            {ciego ? "NO SABÉS" : "VA A HACER"}
+          </span>
+          {ciego ? (
+            <p className="text-base leading-snug text-sueno">
+              Se mueve y no llegás a entender qué está por hacer.
+            </p>
+          ) : (
+            <>
+              <p className="text-base leading-snug text-agua">{intencion.tell}</p>
+              <p className="text-sm text-dim">{numerosDe(intencion)}</p>
+            </>
+          )}
         </div>
       )}
 

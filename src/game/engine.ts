@@ -139,6 +139,14 @@ export function defectosActivos(state: State): Defecto[] {
   return state.jugador.defectos.map((id) => DEFECTOS[id]);
 }
 
+/**
+ * Si ves lo que el enemigo va a hacer el turno que viene. Cuando no lo ves,
+ * bloquear deja de ser una lectura y pasa a ser una apuesta.
+ */
+export function veElAviso(state: State): boolean {
+  return !defectosActivos(state).some((d) => d.sinAviso);
+}
+
 export function puedeHuir(state: State): boolean {
   if (state.combate && ENEMIGOS[state.combate.enemigoId].profesor) return false;
   return !defectosActivos(state).some((d) => d.sinHuida);
