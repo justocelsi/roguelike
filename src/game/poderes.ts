@@ -33,9 +33,9 @@ export const PODERES: Record<string, Poder> = {
   parpadeo: {
     id: "parpadeo",
     nombre: "Parpadeo",
-    texto: "Cerrás los ojos y el golpe pasa de largo. Anula el próximo ataque.",
+    texto: "Cerrás los ojos un segundo largo. Recuperás 25.",
     usos: 2,
-    efecto: { anula: true },
+    efecto: { vida: 25 },
   },
   memoria: {
     id: "memoria",
@@ -81,8 +81,8 @@ export const DEFECTOS: Record<string, Defecto> = {
   menos_puertas: {
     id: "menos_puertas",
     nombre: "Menos puertas",
-    texto: "El pasillo se angosta. Te ofrecen un aula menos.",
-    menosAulas: true,
+    texto: "El pasillo se angosta. Hay dos aulas menos antes del profesor.",
+    menosPuertas: true,
   },
   resaca: {
     id: "resaca",

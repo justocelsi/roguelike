@@ -1,25 +1,20 @@
 /** Tipos del motor. Sin React, sin DOM: esto corre en cualquier lado. */
 
-export type Atributo = "conocimiento" | "nervio" | "reflejos";
+import type { Mundo } from "./mundo";
+
 export type Efecto = "confusion" | "miedo" | "torpeza";
 
-/** Las acciones de combate. Toda acción consume un turno. */
-export type Accion =
-  | "resolver"
-  | "aguantar"
-  | "esquivar"
-  | "arma"
-  | "item"
-  | "poder"
-  | "huir";
+/**
+ * Cinco acciones y ninguna estadística detrás. Toda acción consume un turno.
+ * La decisión no es "cuál pega más" sino "qué corresponde ahora".
+ */
+export type Accion = "atacar" | "esperar" | "arma" | "usar" | "huir";
 
 // --- contenido ------------------------------------------------------------
 
 export type Materia = {
   id: string;
   nombre: string;
-  /** Qué atributo lastima esta materia. */
-  atributo: Atributo;
   efecto: Efecto;
   enemigos: string[];
   armas: string[];
@@ -37,18 +32,17 @@ export type Enemigo = {
   id: string;
   nombre: string;
   vida: number;
-  /** El verbo que le funciona mejor. Descubrirlo es el juego. */
-  debilidad: Extract<Accion, "resolver" | "aguantar" | "esquivar">;
-  /** Patrón cíclico de intenciones. */
   patron: Intencion[];
-  xp: number;
+  /** Los profesores cierran el ciclo y no se pueden esquivar. */
+  profesor?: boolean;
 };
 
 export type Arma = {
   id: string;
   nombre: string;
   daño: number;
-  /** Texto al usarla. */
+  /** Se gasta. Es la razón por la que no la usás siempre. */
+  usos: number;
   texto: string;
 };
 
@@ -59,14 +53,12 @@ export type Item = {
   efecto: { vida?: number; limpia?: boolean; daño?: number };
 };
 
-/** Poder y defecto se sortean por separado: 6 × 6 = 36 ofertas. */
 export type Poder = {
   id: string;
   nombre: string;
   texto: string;
   usos: number;
-  /** Daño directo, curación, o limpieza de efectos. */
-  efecto: { daño?: number; vida?: number; limpia?: boolean; anula?: boolean };
+  efecto: { daño?: number; vida?: number; limpia?: boolean };
 };
 
 export type Defecto = {
@@ -74,17 +66,11 @@ export type Defecto = {
   nombre: string;
   texto: string;
   // --- interceptores sobre el motor ---
-  /** Modifica el daño que hacés. */
   daño?: (base: number) => number;
-  /** Modifica el daño que recibís. */
   recibido?: (base: number) => number;
-  /** Vida máxima. */
   vidaMax?: (base: number) => number;
-  /** No se puede huir. */
   sinHuida?: boolean;
-  /** Aulas ofrecidas por vez. */
-  menosAulas?: boolean;
-  /** Los efectos duran un turno más. */
+  menosPuertas?: boolean;
   efectosLargos?: boolean;
 };
 
@@ -97,40 +83,17 @@ export type Combate = {
   materiaId: string;
   vida: number;
   vidaMax: number;
-  /** Índice dentro del patrón del enemigo. */
   paso: number;
-  /** Si el jugador está aguantando este turno. */
-  aguantando: boolean;
-  /** Debilidad ya descubierta por el jugador. */
-  debilidadVista: boolean;
+  esperando: boolean;
 };
 
-export type Aula = {
-  id: string;
-  materiaId: string;
-  /** Enemigos posibles con su probabilidad declarada. */
-  lecturas: { enemigoId: string; prob: number }[];
-  /** El que realmente está. */
-  sorteado: string;
-};
-
-export type Fase =
-  | "eligiendo-aula"
-  | "combate"
-  | "recompensa"
-  | "subir-nivel"
-  | "sueño"
-  | "muerto"
-  | "fin";
+export type Fase = "pasillo" | "combate" | "recompensa" | "sueño" | "muerto" | "fin";
 
 export type Jugador = {
-  nivel: number;
-  xp: number;
-  xpSiguiente: number;
   vida: number;
   vidaMax: number;
-  atributos: Record<Atributo, number>;
   armaId: string | null;
+  armaUsos: number;
   items: string[];
   sombras: string[];
   poderes: { id: string; usos: number }[];
@@ -145,21 +108,19 @@ export type Entrada = {
 export type State = {
   seed: number;
   ciclo: number;
-  /** Aulas completadas en este ciclo. */
-  aulasHechas: number;
   fase: Fase;
   jugador: Jugador;
 
-  aulas: Aula[];
+  /** El pasillo que estás caminando. */
+  mundo: Mundo | null;
   combate: Combate | null;
   efectos: EfectoActivo[];
 
   /** Nivel de deformación por materia: 0 limpia, 3 irreconocible. */
   deformacion: Record<string, number>;
-  /** Nombres deformados ya asignados. */
-  alias: Record<string, string>;
+  /** Se venció al profesor: al salir de la recompensa se duerme. */
+  cicloTerminado: boolean;
 
-  /** Oferta del sueño. */
   oferta: { poderId: string; defectoId: string }[];
 
   log: Entrada[];
@@ -167,9 +128,8 @@ export type State = {
 };
 
 export type Action =
-  | { type: "elegir-aula"; aulaId: string }
+  | { type: "entrar-aula"; puertaX: number; puertaY: number }
   | { type: "combate"; accion: Accion; ref?: string }
   | { type: "seguir" }
-  | { type: "subir"; atributo: Atributo }
   | { type: "aceptar-oferta"; index: number }
   | { type: "reiniciar"; seed?: number };

@@ -1,29 +1,21 @@
 /**
  * El motor. Un reducer puro: (State, Action) => State.
  *
- * Sin React y sin DOM. Todo el azar pasa por el RNG sembrado que vive en el
- * propio estado, así que una run entera es reproducible desde su semilla.
+ * Sin atributos, sin niveles, sin XP. Una sola barra de vida y cinco acciones.
+ * La dificultad no sale de los números sino de leer lo que el enemigo avisa
+ * que va a hacer y decidir si pegás o te cubrís.
  *
- * Los defectos no están cableados: el motor los consulta como interceptores en
- * cada punto donde toma una decisión.
+ * El movimiento no pasa por acá: el pasillo lo maneja el renderer y sólo
+ * dispara eventos discretos (entrar a un aula). El reducer no sabe de píxeles.
  */
 
-import {
-  ARMAS,
-  ENEMIGOS,
-  ITEMS,
-  ITEM_IDS,
-  MATERIAS,
-  MATERIA_IDS,
-  nombreMateria,
-} from "./content";
+import { ARMAS, ENEMIGOS, ITEMS, ITEM_IDS, MATERIAS, MATERIA_IDS, nombreMateria } from "./content";
+import { generarPasillo, type Mundo } from "./mundo";
 import { DEFECTOS, DEFECTO_IDS, PODERES, PODER_IDS } from "./poderes";
-import { makeRng, pick, pickMany, randInt, random, randomSeed, type Rng } from "./rng";
+import { makeRng, pick, pickMany, random, randomSeed, type Rng } from "./rng";
 import type {
   Accion,
   Action,
-  Atributo,
-  Aula,
   Defecto,
   Efecto,
   Entrada,
@@ -31,32 +23,28 @@ import type {
   State,
 } from "./types";
 
-export const AULAS_POR_CICLO = 6;
 export const CICLOS = 5;
-export const VIDA_BASE = 40;
-export const ATRIBUTO_BASE = 4;
-/** Turnos que dura un efecto al aplicarse. */
+export const VIDA_BASE = 45;
+/** Daño del ataque a mano limpia. Fijo: no hay stats que lo escalen. */
+export const DAÑO_ATAQUE = 12;
+/**
+ * Cubrirte justo cuando venía el golpe no sólo lo amortigua: contraatacás.
+ * Sin esto, leer bien el aviso te costaba la mitad de tu daño y esperar era
+ * siempre una pérdida.
+ */
+export const DAÑO_CONTRA = 15;
 const DURACION_EFECTO = 2;
-/**
- * El colegio se pone peor a la par tuya. Sin esto, subir de nivel volvería la
- * run cada vez más fácil y el ciclo 5 sería más blando que el 1.
- */
-export function escala(state: State): number {
-  return 1 + (state.ciclo - 1) * ESCALA_VIDA;
-}
 
-/**
- * El daño escala mucho más despacio que la vida: así las peleas tardías son
- * más largas y tensas en vez de matarte de dos golpes.
- */
+/** El colegio empeora por ciclo. Sin esto, el ciclo 5 sería igual que el 1. */
+const EV = Number(process.env.NEXT_PUBLIC_EV ?? 0.1);
+const ED = Number(process.env.NEXT_PUBLIC_ED ?? 0.04);
+
+export function escalaVida(state: State): number {
+  return 1 + (state.ciclo - 1) * EV;
+}
 export function escalaDaño(state: State): number {
-  return 1 + (state.ciclo - 1) * ESCALA_DAÑO;
+  return 1 + (state.ciclo - 1) * ED;
 }
-
-/** Perillas de balance. Se afinan jugando; el env sólo se usa para simular. */
-export const ESCALA_VIDA = Number(process.env.NEXT_PUBLIC_ESCALA_VIDA ?? 0.3);
-export const ESCALA_DAÑO = Number(process.env.NEXT_PUBLIC_ESCALA_DANO ?? 0.1);
-export const MULT_DAÑO = Number(process.env.NEXT_PUBLIC_MULT_DANO ?? 1.0);
 
 // --- interceptores --------------------------------------------------------
 
@@ -64,34 +52,21 @@ export function defectosActivos(state: State): Defecto[] {
   return state.jugador.defectos.map((id) => DEFECTOS[id]);
 }
 
-export function vidaMaxima(state: State): number {
-  let v = VIDA_BASE + state.jugador.nivel * 6;
-  for (const d of defectosActivos(state)) if (d.vidaMax) v = d.vidaMax(v);
-  return v;
-}
-
 export function puedeHuir(state: State): boolean {
+  if (state.combate && ENEMIGOS[state.combate.enemigoId].profesor) return false;
   return !defectosActivos(state).some((d) => d.sinHuida);
-}
-
-function aulasOfrecidas(state: State): number {
-  return defectosActivos(state).some((d) => d.menosAulas) ? 2 : 3;
 }
 
 function duracionEfecto(state: State): number {
   return (
-    DURACION_EFECTO +
-    (defectosActivos(state).some((d) => d.efectosLargos) ? 1 : 0)
+    DURACION_EFECTO + (defectosActivos(state).some((d) => d.efectosLargos) ? 1 : 0)
   );
 }
-
-// --- consultas de estado --------------------------------------------------
 
 export function tieneEfecto(state: State, e: Efecto): boolean {
   return state.efectos.some((x) => x.efecto === e);
 }
 
-/** La interfaz consulta esto para saber si tiene que mostrar los datos mal. */
 export function confundido(state: State): boolean {
   return tieneEfecto(state, "confusion");
 }
@@ -100,38 +75,7 @@ export function nombreDe(state: State, materiaId: string): string {
   return nombreMateria(materiaId, state.deformacion[materiaId] ?? 0);
 }
 
-/** El atributo que lastima una materia. Con deformación 3, cambia. */
-export function atributoDe(state: State, materiaId: string): Atributo {
-  const base = MATERIAS[materiaId].atributo;
-  if ((state.deformacion[materiaId] ?? 0) < 3) return base;
-  const rot: Record<Atributo, Atributo> = {
-    conocimiento: "nervio",
-    nervio: "reflejos",
-    reflejos: "conocimiento",
-  };
-  return rot[base];
-}
-
-export function dañoDe(state: State, accion: Accion): number {
-  const a = state.jugador.atributos;
-  let base: number;
-  switch (accion) {
-    case "resolver":
-      base = 5 + a.conocimiento * 1.6;
-      break;
-    case "esquivar":
-      base = 2 + a.reflejos * 1.1;
-      break;
-    case "arma":
-      base = state.jugador.armaId ? ARMAS[state.jugador.armaId].daño : 3;
-      break;
-    default:
-      base = 0;
-  }
-  return Math.round(base);
-}
-
-// --- helpers internos -----------------------------------------------------
+// --- helpers --------------------------------------------------------------
 
 function log(
   entradas: Entrada[],
@@ -153,50 +97,20 @@ function aplicarRecibido(state: State, base: number): number {
   return Math.max(1, Math.round(d));
 }
 
-/** Genera la oferta de aulas del momento. */
-function generarAulas(state: State, rng: Rng): Aula[] {
-  const n = aulasOfrecidas(state);
-  return Array.from({ length: n }, (_, i) => {
-    const materiaId = pick(rng, MATERIA_IDS);
-    const materia = MATERIAS[materiaId];
-    const deform = state.deformacion[materiaId] ?? 0;
+function vidaMaxima(state: State, base: number): number {
+  let v = base;
+  for (const d of defectosActivos(state)) if (d.vidaMax) v = d.vidaMax(v);
+  return v;
+}
 
-    // Deformación 1+: se cuelan enemigos de otra materia.
-    const propios = materia.enemigos;
-    const ajenos =
-      deform >= 1
-        ? MATERIAS[pick(rng, MATERIA_IDS.filter((m) => m !== materiaId))].enemigos
-        : [];
-    const pool = [...propios, ...(ajenos.length ? [pick(rng, ajenos)] : [])];
-
-    const elegidos = pickMany(rng, pool, Math.min(3, pool.length));
-    const pesos = elegidos.map(() => randInt(rng, 1, 5));
-    const total = pesos.reduce((a, b) => a + b, 0);
-    const lecturas = elegidos.map((enemigoId, k) => ({
-      enemigoId,
-      prob: pesos[k] / total,
-    }));
-
-    let roll = random(rng);
-    let sorteado = lecturas[lecturas.length - 1].enemigoId;
-    for (const l of lecturas) {
-      roll -= l.prob;
-      if (roll <= 0) {
-        sorteado = l.enemigoId;
-        break;
-      }
-    }
-
-    return {
-      id: `aula-${state.ciclo}-${state.aulasHechas}-${i}`,
-      materiaId,
-      lecturas,
-      sorteado,
-    };
+function nuevoPasillo(state: State, rng: Rng): Mundo {
+  const menos = defectosActivos(state).some((d) => d.menosPuertas);
+  return generarPasillo(rng, {
+    cantidadPuertas: menos ? 3 : 5,
+    deformacion: state.deformacion,
   });
 }
 
-/** Arma la oferta del sueño: tres pares poder + defecto, sorteados aparte. */
 function generarOferta(state: State, rng: Rng) {
   const poderesLibres = PODER_IDS.filter(
     (p) => !state.jugador.poderes.some((x) => x.id === p),
@@ -212,41 +126,24 @@ function generarOferta(state: State, rng: Rng) {
   }));
 }
 
-function entrarAlSueño(state: State, rng: Rng): State {
-  return {
-    ...state,
-    fase: "sueño",
-    combate: null,
-    efectos: [],
-    oferta: generarOferta(state, rng),
-    log: log(state.log, "Se te cierran los ojos. El pasillo sigue.", "sueño"),
-  };
-}
-
 /** Cada ciclo el colegio se corrompe un escalón más. */
 function deformar(state: State, rng: Rng): State {
   const objetivos = pickMany(rng, MATERIA_IDS, 2);
   const deformacion = { ...state.deformacion };
-  const entradas: string[] = [];
+  let l = state.log;
   for (const m of objetivos) {
     const antes = deformacion[m] ?? 0;
     if (antes >= 3) continue;
     deformacion[m] = antes + 1;
-    if (antes + 1 === 2) {
-      entradas.push(
-        `${NOMBRE_PREVIO(m, antes)} ahora dice ${nombreMateria(m, antes + 1)}.`,
+    if (antes + 1 >= 2) {
+      l = log(
+        l,
+        `Donde decía ${nombreMateria(m, antes)} ahora dice ${nombreMateria(m, antes + 1)}.`,
+        "sueño",
       );
-    } else if (antes + 1 === 3) {
-      entradas.push(`${nombreMateria(m, 3)} ya no lastima donde lastimaba.`);
     }
   }
-  let l = state.log;
-  for (const e of entradas) l = log(l, e, "sueño");
   return { ...state, deformacion, log: l };
-}
-
-function NOMBRE_PREVIO(materiaId: string, deform: number): string {
-  return nombreMateria(materiaId, deform);
 }
 
 function despertar(state: State, rng: Rng): State {
@@ -255,27 +152,29 @@ function despertar(state: State, rng: Rng): State {
     return {
       ...state,
       fase: "fin",
+      mundo: null,
       final:
-        "Sonó el timbre y no había nadie más en el pasillo. Saliste. Nadie te vio salir.",
+        "Saliste al patio y estaba amaneciendo de verdad. Dormiste catorce horas. Cuando te despertaste no te acordabas de nada, y eso fue lo peor.",
     };
   }
-  const deformado = deformar({ ...state, ciclo, aulasHechas: 0 }, rng);
-  const jugador = {
-    ...deformado.jugador,
-    vida: vidaMaxima(deformado),
-    vidaMax: vidaMaxima(deformado),
-  };
+  const deformado = deformar({ ...state, ciclo }, rng);
   const base: State = {
     ...deformado,
-    jugador,
-    fase: "eligiendo-aula",
+    fase: "pasillo",
     oferta: [],
-    log: log(deformado.log, `Ciclo ${ciclo}. Algo cambió de lugar.`, "sueño"),
+    efectos: [],
+    log: log(deformado.log, "Te despertás. El pasillo es más largo.", "malo"),
   };
-  return { ...base, aulas: generarAulas(base, rng) };
+  return { ...base, mundo: nuevoPasillo(base, rng) };
 }
 
 // --- combate --------------------------------------------------------------
+
+const TEXTO_EFECTO: Record<Efecto, string> = {
+  confusion: "Dejás de entender lo que estás mirando.",
+  miedo: "Se te va la mano al costado. No responde.",
+  torpeza: "El cuerpo te llega tarde.",
+};
 
 function turnoEnemigo(state: State, rng: Rng): State {
   const c = state.combate;
@@ -284,14 +183,22 @@ function turnoEnemigo(state: State, rng: Rng): State {
   const intencion = enemigo.patron[c.paso % enemigo.patron.length];
   let s = state;
 
+  let contra = 0;
   if (intencion.tipo === "golpe") {
-    let daño = aplicarRecibido(s, (intencion.daño ?? 0) * MULT_DAÑO * escalaDaño(s));
-    if (c.aguantando) {
-      const reduccion = 0.5 + s.jugador.atributos.nervio * 0.02;
-      daño = Math.max(1, Math.round(daño * (1 - Math.min(0.85, reduccion))));
-      s = { ...s, log: log(s.log, `Aguantás. Sólo entran ${daño}.`, "malo") };
+    let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
+    if (c.esperando) {
+      daño = Math.max(1, Math.round(daño * 0.2));
+      contra = aplicarDaño(s, DAÑO_CONTRA);
+      s = {
+        ...s,
+        log: log(
+          s.log,
+          `Lo viste venir. Entran ${daño} y le devolvés ${contra}.`,
+          "bueno",
+        ),
+      };
     } else {
-      s = { ...s, log: log(s.log, `Te alcanza. ${daño}.`, "malo") };
+      s = { ...s, log: log(s.log, `Te alcanza de lleno. ${daño}.`, "malo") };
     }
     s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
   } else if (intencion.tipo === "efecto" && intencion.efecto) {
@@ -300,57 +207,69 @@ function turnoEnemigo(state: State, rng: Rng): State {
     s = {
       ...s,
       efectos: ya
-        ? s.efectos.map((x) =>
-            x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x,
-          )
+        ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
         : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
-      log: log(s.log, NOMBRE_EFECTO[ef], "enemigo"),
+      log: log(s.log, TEXTO_EFECTO[ef], "enemigo"),
     };
   }
 
   return {
     ...s,
-    combate: { ...c, paso: c.paso + 1, aguantando: false },
+    combate: {
+      ...c,
+      vida: s.combate!.vida - contra,
+      paso: c.paso + 1,
+      esperando: false,
+    },
   };
 }
 
-const NOMBRE_EFECTO: Record<Efecto, string> = {
-  confusion: "Dejás de entender lo que estás mirando.",
-  miedo: "Se te va la mano al costado. No responde.",
-  torpeza: "El cuerpo te llega tarde.",
-};
-
-function tickEfectos(state: State): State {
-  return {
-    ...state,
-    efectos: state.efectos
-      .map((e) => ({ ...e, turnos: e.turnos - 1 }))
-      .filter((e) => e.turnos > 0),
+function cerrarTurno(state: State, rng: Rng): State {
+  let s = turnoEnemigo(state, rng);
+  if (tieneEfecto(s, "torpeza") && s.jugador.vida > 0) {
+    s = { ...s, log: log(s.log, "Todavía no terminaste de moverte.", "enemigo") };
+    s = turnoEnemigo(s, rng);
+  }
+  s = {
+    ...s,
+    efectos: s.efectos.map((e) => ({ ...e, turnos: e.turnos - 1 })).filter((e) => e.turnos > 0),
   };
+
+  if (s.jugador.vida <= 0) {
+    return {
+      ...s,
+      jugador: { ...s.jugador, vida: 0 },
+      fase: "muerto",
+      combate: null,
+      mundo: null,
+      final: "No sonó ningún timbre.",
+    };
+  }
+  // El contraataque puede haber sido el golpe final.
+  if (s.combate && s.combate.vida <= 0) return ganarCombate(s, rng);
+  return s;
 }
 
 function ganarCombate(state: State, rng: Rng): State {
   const c = state.combate!;
   const enemigo = ENEMIGOS[c.enemigoId];
   const materia = MATERIAS[c.materiaId];
-
   let jugador: Jugador = {
     ...state.jugador,
-    xp: state.jugador.xp + enemigo.xp,
     sombras: [...state.jugador.sombras, enemigo.id],
   };
-
   let l = log(state.log, `${enemigo.nombre} deja de estar.`, "bueno");
-  l = log(l, `Te queda su sombra. +${enemigo.xp} XP.`, "bueno");
 
-  // Botín: a veces el arma de la materia, a veces un consumible.
-  if (random(rng) < 0.35) {
+  if (enemigo.profesor) {
+    // Vencer a un profesor es la única progresión permanente que hay.
+    const nuevaMax = vidaMaxima(state, state.jugador.vidaMax + 6);
+    jugador = { ...jugador, vidaMax: nuevaMax, vida: nuevaMax };
+    l = log(l, "Aguantás un poco más que antes. +6 de vida máxima.", "bueno");
+  } else if (materia && random(rng) < 0.45) {
     const armaId = pick(rng, materia.armas);
-    if (jugador.armaId !== armaId) {
-      jugador = { ...jugador, armaId };
-      l = log(l, `Agarrás ${ARMAS[armaId].nombre}.`, "bueno");
-    }
-  } else if (random(rng) < 0.5 && jugador.items.length < 4) {
+    jugador = { ...jugador, armaId, armaUsos: ARMAS[armaId].usos };
+    l = log(l, `Agarrás ${ARMAS[armaId].nombre}. ${ARMAS[armaId].usos} usos.`, "bueno");
+  } else if (jugador.items.length < 5) {
     const itemId = pick(rng, ITEM_IDS);
     jugador = { ...jugador, items: [...jugador.items, itemId] };
     l = log(l, `Guardás ${ITEMS[itemId].nombre}.`, "bueno");
@@ -362,6 +281,7 @@ function ganarCombate(state: State, rng: Rng): State {
     combate: null,
     efectos: [],
     fase: "recompensa",
+    cicloTerminado: !!enemigo.profesor,
     log: l,
   };
 }
@@ -371,17 +291,10 @@ function ganarCombate(state: State, rng: Rng): State {
 export function initialState(seed: number = randomSeed()): State {
   const rng = makeRng(seed);
   const jugador: Jugador = {
-    nivel: 1,
-    xp: 0,
-    xpSiguiente: 25,
-    vida: VIDA_BASE + 6,
-    vidaMax: VIDA_BASE + 6,
-    atributos: {
-      conocimiento: ATRIBUTO_BASE,
-      nervio: ATRIBUTO_BASE,
-      reflejos: ATRIBUTO_BASE,
-    },
+    vida: VIDA_BASE,
+    vidaMax: VIDA_BASE,
     armaId: null,
+    armaUsos: 0,
     items: ["agua"],
     sombras: [],
     poderes: [],
@@ -390,19 +303,18 @@ export function initialState(seed: number = randomSeed()): State {
   const base: State = {
     seed,
     ciclo: 1,
-    aulasHechas: 0,
-    fase: "eligiendo-aula",
+    fase: "pasillo",
     jugador,
-    aulas: [],
+    mundo: null,
     combate: null,
     efectos: [],
     deformacion: Object.fromEntries(MATERIA_IDS.map((m) => [m, 0])),
-    alias: {},
+    cicloTerminado: false,
     oferta: [],
-    log: [{ texto: "Sonó el timbre. No te acordás de haber entrado.", tipo: "neutral" }],
+    log: [{ texto: "Hace tres días que no dormís bien. Sonó el timbre.", tipo: "neutral" }],
     final: null,
   };
-  return { ...base, aulas: generarAulas(base, rng), seed: rng.seed };
+  return { ...base, mundo: nuevoPasillo(base, rng), seed: rng.seed };
 }
 
 // --- reducer --------------------------------------------------------------
@@ -416,32 +328,44 @@ export function reduce(state: State, action: Action): State {
 
 function apply(state: State, action: Action, rng: Rng): State {
   switch (action.type) {
-    case "elegir-aula": {
-      if (state.fase !== "eligiendo-aula") return state;
-      const aula = state.aulas.find((a) => a.id === action.aulaId);
-      if (!aula) return state;
-      const enemigo = ENEMIGOS[aula.sorteado];
-      const vidaMax = vidaMaxima(state);
-      const vidaEnemigo = Math.round(enemigo.vida * escala(state));
+    case "entrar-aula": {
+      if (state.fase !== "pasillo" || !state.mundo) return state;
+      const puerta = state.mundo.puertas.find(
+        (p) => p.x === action.puertaX && p.y === action.puertaY,
+      );
+      if (!puerta || puerta.usada) return state;
+      const enemigo = ENEMIGOS[puerta.sorteado];
+      const vidaEnemigo = Math.round(enemigo.vida * escalaVida(state));
+
+      const mundo: Mundo = {
+        ...state.mundo,
+        puertas: state.mundo.puertas.map((p) =>
+          p === puerta ? { ...p, usada: true } : p,
+        ),
+      };
 
       return {
         ...state,
         fase: "combate",
-        // La vida vuelve al máximo al entrar: cada combate es autocontenido.
-        jugador: { ...state.jugador, vida: vidaMax, vidaMax },
+        mundo,
         efectos: [],
+        // Entrás entero: cada combate es un desafío letal autocontenido, no
+        // una carrera de desgaste por el pasillo.
+        jugador: { ...state.jugador, vida: state.jugador.vidaMax },
         combate: {
           enemigoId: enemigo.id,
-          materiaId: aula.materiaId,
+          materiaId: puerta.materiaId,
           vida: vidaEnemigo,
           vidaMax: vidaEnemigo,
           paso: 0,
-          aguantando: false,
-          debilidadVista: false,
+          esperando: false,
         },
         log: log(
           state.log,
-          `${nombreDe(state, aula.materiaId)}. Hay ${enemigo.nombre}.`,
+          enemigo.profesor
+            ? `Adentro está ${enemigo.nombre}. La puerta no abre para atrás.`
+            : `${nombreDe(state, puerta.materiaId)}. Hay ${enemigo.nombre}.`,
+          enemigo.profesor ? "malo" : "neutral",
         ),
       };
     }
@@ -450,33 +374,9 @@ function apply(state: State, action: Action, rng: Rng): State {
       return turnoDeCombate(state, action.accion, action.ref, rng);
 
     case "seguir": {
-      if (state.fase === "recompensa") {
-        const j = state.jugador;
-        if (j.xp >= j.xpSiguiente) return { ...state, fase: "subir-nivel" };
-        return avanzar(state, rng);
-      }
-      return state;
-    }
-
-    case "subir": {
-      if (state.fase !== "subir-nivel") return state;
-      const j = state.jugador;
-      const jugador: Jugador = {
-        ...j,
-        nivel: j.nivel + 1,
-        xp: j.xp - j.xpSiguiente,
-        xpSiguiente: Math.round(j.xpSiguiente * 1.6),
-        atributos: {
-          ...j.atributos,
-          [action.atributo]: j.atributos[action.atributo] + 2,
-        },
-      };
-      const subido: State = {
-        ...state,
-        jugador,
-        log: log(state.log, `Nivel ${jugador.nivel}. Subís ${action.atributo}.`, "bueno"),
-      };
-      return avanzar(subido, rng);
+      if (state.fase !== "recompensa") return state;
+      // Si lo que cayó era un profesor, se termina el ciclo y se duerme.
+      return volverAlPasillo(state, rng, state.cicloTerminado);
     }
 
     case "aceptar-oferta": {
@@ -495,8 +395,7 @@ function apply(state: State, action: Action, rng: Rng): State {
         jugador,
         log: log(
           log(state.log, `${poder.nombre}. ${poder.texto}`, "sueño"),
-          `Y con eso viene ${defecto.nombre}. ${defecto.texto}`,
-          "malo",
+          `El precio: ${defecto.nombre}. ${defecto.texto}`, "malo",
         ),
       };
       return despertar(aceptado, rng);
@@ -507,14 +406,18 @@ function apply(state: State, action: Action, rng: Rng): State {
   }
 }
 
-/** Terminado un aula: siguiente aula, o a dormir si se acabó el ciclo. */
-function avanzar(state: State, rng: Rng): State {
-  const aulasHechas = state.aulasHechas + 1;
-  if (aulasHechas >= AULAS_POR_CICLO) {
-    return entrarAlSueño({ ...state, aulasHechas }, rng);
+function volverAlPasillo(state: State, rng: Rng, forzarSueño: boolean): State {
+  if (forzarSueño) {
+    return {
+      ...state,
+      fase: "sueño",
+      mundo: null,
+      cicloTerminado: false,
+      oferta: generarOferta(state, rng),
+      log: log(state.log, "Te sentás en el pasillo y por fin te dormís.", "sueño"),
+    };
   }
-  const base: State = { ...state, aulasHechas, fase: "eligiendo-aula" };
-  return { ...base, aulas: generarAulas(base, rng) };
+  return { ...state, fase: "pasillo" };
 }
 
 function turnoDeCombate(
@@ -525,102 +428,93 @@ function turnoDeCombate(
 ): State {
   if (state.fase !== "combate" || !state.combate) return state;
   const c = state.combate;
-  const enemigo = ENEMIGOS[c.enemigoId];
   let s = state;
 
   if (accion === "huir") {
     if (!puedeHuir(s)) return s;
-    return avanzar(
-      {
-        ...s,
-        combate: null,
-        efectos: [],
-        log: log(s.log, "Salís al pasillo. No mirás atrás.", "neutral"),
-      },
-      rng,
-    );
+    return {
+      ...s,
+      fase: "pasillo",
+      combate: null,
+      efectos: [],
+      log: log(s.log, "Salís al pasillo. No mirás atrás.", "neutral"),
+    };
   }
 
   // El miedo puede hacer que la acción no salga.
-  if (tieneEfecto(s, "miedo")) {
-    const falla = Math.max(0.08, 0.4 - s.jugador.atributos.nervio * 0.025);
-    if (random(rng) < falla) {
-      s = { ...s, log: log(s.log, "No te sale. Te quedás duro.", "malo") };
-      return cerrarTurno(s, rng);
-    }
+  if (tieneEfecto(s, "miedo") && random(rng) < 0.3) {
+    s = { ...s, log: log(s.log, "No te sale. Te quedás duro.", "malo") };
+    return cerrarTurno(s, rng);
   }
 
   let vidaEnemigo = c.vida;
-  let aguantando = false;
-  let debilidadVista = c.debilidadVista;
+  let esperando = false;
 
   switch (accion) {
-    case "resolver":
-    case "esquivar": {
-      // Acertarle a la debilidad es la diferencia entre ganar y no ganar.
-      // El verbo equivocado casi no lastima: encontrarla es el combate.
-      const acierta = enemigo.debilidad === accion;
-      let d = aplicarDaño(s, dañoDe(s, accion));
-      d = Math.round(d * (acierta ? 2 : 0.5));
-      if (acierta) debilidadVista = true;
+    case "atacar": {
+      const d = aplicarDaño(s, DAÑO_ATAQUE);
       vidaEnemigo -= d;
-      s = {
-        ...s,
-        log: log(
-          s.log,
-          acierta
-            ? `${accion === "resolver" ? "Resolvés" : "Esquivás"} y era eso. ${d}.`
-            : `${accion === "resolver" ? "Resolvés" : "Esquivás"}. ${d}.`,
-          acierta ? "bueno" : "neutral",
-        ),
-      };
+      s = { ...s, log: log(s.log, `Le pegás. ${d}.`, "neutral") };
       break;
     }
-    case "aguantar": {
-      aguantando = true;
-      const acierta = enemigo.debilidad === "aguantar";
-      const cura = acierta
-        ? 2 + Math.round(s.jugador.atributos.nervio * 0.4)
-        : 2;
-      if (acierta) debilidadVista = true;
+    case "esperar": {
+      esperando = true;
+      s = { ...s, log: log(s.log, "Te cubrís y esperás.", "neutral") };
+      break;
+    }
+    case "arma": {
+      if (!s.jugador.armaId || s.jugador.armaUsos <= 0) return s;
+      const arma = ARMAS[s.jugador.armaId];
+      const d = aplicarDaño(s, arma.daño);
+      vidaEnemigo -= d;
+      const usos = s.jugador.armaUsos - 1;
       s = {
         ...s,
         jugador: {
           ...s.jugador,
-          vida: Math.min(s.jugador.vidaMax, s.jugador.vida + cura),
+          armaUsos: usos,
+          armaId: usos > 0 ? s.jugador.armaId : null,
         },
-        log: log(s.log, `Te plantás. Recuperás ${cura}.`, "neutral"),
+        log: log(
+          s.log,
+          usos > 0 ? `${arma.texto} ${d}.` : `${arma.texto} ${d}. Y se rompe.`,
+          usos > 0 ? "bueno" : "malo",
+        ),
       };
-      if (acierta) {
-        const d = aplicarDaño(s, 6 + s.jugador.atributos.nervio);
-        vidaEnemigo -= d;
-        s = { ...s, log: log(s.log, `Se cansa contra vos. ${d}.`, "bueno") };
-      }
       break;
     }
-    case "arma": {
-      if (!s.jugador.armaId) return s;
-      const arma = ARMAS[s.jugador.armaId];
-      const d = aplicarDaño(s, dañoDe(s, "arma"));
-      vidaEnemigo -= d;
-      s = { ...s, log: log(s.log, `${arma.texto} ${d}.`, "neutral") };
-      break;
-    }
-    case "item": {
+    case "usar": {
       if (!ref) return s;
-      // Las sombras se gastan en sacarte lo que tengas encima.
       if (ref.startsWith("sombra:")) {
         const id = ref.slice(7);
-        if (!s.jugador.sombras.includes(id)) return s;
         const i = s.jugador.sombras.indexOf(id);
+        if (i === -1) return s;
         s = {
           ...s,
-          jugador: {
-            ...s.jugador,
-            sombras: s.jugador.sombras.filter((_, k) => k !== i),
-          },
+          jugador: { ...s.jugador, sombras: s.jugador.sombras.filter((_, k) => k !== i) },
           efectos: [],
           log: log(s.log, `La sombra de ${ENEMIGOS[id].nombre} se interpone.`, "bueno"),
+        };
+        break;
+      }
+      if (ref.startsWith("poder:")) {
+        const id = ref.slice(6);
+        const tiene = s.jugador.poderes.find((p) => p.id === id);
+        if (!tiene || tiene.usos <= 0) return s;
+        const poder = PODERES[id];
+        let j = {
+          ...s.jugador,
+          poderes: s.jugador.poderes.map((p) =>
+            p.id === id ? { ...p, usos: p.usos - 1 } : p,
+          ),
+        };
+        if (poder.efecto.daño) vidaEnemigo -= aplicarDaño(s, poder.efecto.daño);
+        if (poder.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + poder.efecto.vida) };
+        s = {
+          ...s,
+          jugador: j,
+          efectos: poder.efecto.limpia ? [] : s.efectos,
+          log: log(s.log, `${poder.nombre}.`, "sueño"),
         };
         break;
       }
@@ -628,9 +522,7 @@ function turnoDeCombate(
       if (idx === -1) return s;
       const item = ITEMS[ref];
       let j = { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) };
-      if (item.efecto.vida) {
-        j = { ...j, vida: Math.min(j.vidaMax, j.vida + item.efecto.vida) };
-      }
+      if (item.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + item.efecto.vida) };
       if (item.efecto.daño) vidaEnemigo -= aplicarDaño(s, item.efecto.daño);
       s = {
         ...s,
@@ -640,58 +532,9 @@ function turnoDeCombate(
       };
       break;
     }
-    case "poder": {
-      if (!ref) return s;
-      const tiene = s.jugador.poderes.find((p) => p.id === ref);
-      if (!tiene || tiene.usos <= 0) return s;
-      const poder = PODERES[ref];
-      let j = {
-        ...s.jugador,
-        poderes: s.jugador.poderes.map((p) =>
-          p.id === ref ? { ...p, usos: p.usos - 1 } : p,
-        ),
-      };
-      if (poder.efecto.daño) vidaEnemigo -= aplicarDaño(s, poder.efecto.daño);
-      if (poder.efecto.vida) {
-        j = { ...j, vida: Math.min(j.vidaMax, j.vida + poder.efecto.vida) };
-      }
-      s = {
-        ...s,
-        jugador: j,
-        efectos: poder.efecto.limpia ? [] : s.efectos,
-        log: log(s.log, `${poder.nombre}.`, "sueño"),
-      };
-      break;
-    }
   }
 
-  s = {
-    ...s,
-    combate: { ...s.combate!, vida: vidaEnemigo, aguantando, debilidadVista },
-  };
-
+  s = { ...s, combate: { ...s.combate!, vida: vidaEnemigo, esperando } };
   if (vidaEnemigo <= 0) return ganarCombate(s, rng);
   return cerrarTurno(s, rng);
-}
-
-/** Turno del enemigo, efectos, y chequeo de muerte. */
-function cerrarTurno(state: State, rng: Rng): State {
-  let s = turnoEnemigo(state, rng);
-  // La torpeza le da un segundo turno.
-  if (tieneEfecto(s, "torpeza") && s.jugador.vida > 0) {
-    s = { ...s, log: log(s.log, "Todavía no terminaste de moverte.", "enemigo") };
-    s = turnoEnemigo(s, rng);
-  }
-  s = tickEfectos(s);
-
-  if (s.jugador.vida <= 0) {
-    return {
-      ...s,
-      jugador: { ...s.jugador, vida: 0 },
-      fase: "muerto",
-      combate: null,
-      final: "No sonó ningún timbre.",
-    };
-  }
-  return s;
 }

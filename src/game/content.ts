@@ -1,12 +1,12 @@
 /**
  * El contenido: las 6 materias y todo lo que cuelga de ellas.
  *
- * El vínculo materia → enemigos → arma → atributo lastimado es una regla
- * generativa, no ambientación. Si el aula es Matemática, la regla es un arma y
- * el enemigo es un teorema. Eso le da al jugador un modelo mental que puede
- * usar para elegir, y le da al juego contenido coherente sin escribir un guión.
+ * El vínculo materia → enemigos → arma es una regla generativa, no
+ * ambientación. Si el aula es Matemática, la regla es un arma y el enemigo es
+ * un teorema.
  *
- * Tono: terror onírico. Serio, sin guiños.
+ * Tono: terror onírico. El chico tiene insomnio hace días; nada de esto es
+ * exactamente real y nada es exactamente un sueño.
  */
 
 import type { Arma, Enemigo, Item, Materia } from "./types";
@@ -15,7 +15,6 @@ export const MATERIAS: Record<string, Materia> = {
   matematica: {
     id: "matematica",
     nombre: "Matemática",
-    atributo: "conocimiento",
     efecto: "confusion",
     enemigos: ["teorema", "demostracion", "problema"],
     armas: ["regla", "compas"],
@@ -23,7 +22,6 @@ export const MATERIAS: Record<string, Materia> = {
   literatura: {
     id: "literatura",
     nombre: "Literatura",
-    atributo: "conocimiento",
     efecto: "confusion",
     enemigos: ["libro", "narrador"],
     armas: ["diccionario"],
@@ -31,7 +29,6 @@ export const MATERIAS: Record<string, Materia> = {
   historia: {
     id: "historia",
     nombre: "Historia",
-    atributo: "nervio",
     efecto: "miedo",
     enemigos: ["vuelve", "fecha"],
     armas: ["puntero"],
@@ -39,7 +36,6 @@ export const MATERIAS: Record<string, Materia> = {
   biologia: {
     id: "biologia",
     nombre: "Biología",
-    atributo: "nervio",
     efecto: "miedo",
     enemigos: ["esqueleto", "formol"],
     armas: ["bisturi"],
@@ -47,7 +43,6 @@ export const MATERIAS: Record<string, Materia> = {
   quimica: {
     id: "quimica",
     nombre: "Química",
-    atributo: "reflejos",
     efecto: "torpeza",
     enemigos: ["reaccion", "campana"],
     armas: ["mechero", "acido"],
@@ -55,7 +50,6 @@ export const MATERIAS: Record<string, Materia> = {
   fisica: {
     id: "fisica",
     nombre: "Educación Física",
-    atributo: "reflejos",
     efecto: "torpeza",
     enemigos: ["ultimo", "soga"],
     armas: ["pelota"],
@@ -77,48 +71,30 @@ export const ENEMIGOS: Record<string, Enemigo> = {
   teorema: {
     id: "teorema",
     nombre: "un teorema que no cierra",
-    vida: 22,
-    debilidad: "resolver",
-    xp: 10,
+    vida: 26,
     patron: [
-      { tell: "Empieza a reescribirse.", tipo: "golpe", daño: 6 },
-      {
-        tell: "Se detiene. Falta un paso y no sabés cuál.",
-        tipo: "efecto",
-        efecto: "confusion",
-      },
-      {
-        tell: "Te muestra el resultado antes de la demostración.",
-        tipo: "golpe",
-        daño: 9,
-      },
+      { tell: "Empieza a reescribirse.", tipo: "golpe", daño: 7 },
+      { tell: "Se detiene. Falta un paso.", tipo: "efecto", efecto: "confusion" },
+      { tell: "Te muestra el resultado antes de la demostración.", tipo: "golpe", daño: 12 },
     ],
   },
   demostracion: {
     id: "demostracion",
     nombre: "una demostración circular",
-    vida: 28,
-    debilidad: "aguantar",
-    xp: 12,
+    vida: 30,
     patron: [
-      { tell: "Vuelve al principio.", tipo: "golpe", daño: 5 },
-      { tell: "Vuelve al principio.", tipo: "golpe", daño: 5 },
-      { tell: "Vuelve al principio. Otra vez.", tipo: "golpe", daño: 11 },
+      { tell: "Vuelve al principio.", tipo: "golpe", daño: 6 },
+      { tell: "Vuelve al principio.", tipo: "espera" },
+      { tell: "Vuelve al principio. Otra vez.", tipo: "golpe", daño: 14 },
     ],
   },
   problema: {
     id: "problema",
     nombre: "un problema sin enunciado",
-    vida: 18,
-    debilidad: "resolver",
-    xp: 9,
+    vida: 20,
     patron: [
-      {
-        tell: "Espera una respuesta a algo que no preguntó.",
-        tipo: "efecto",
-        efecto: "confusion",
-      },
-      { tell: "Se te acaba el tiempo.", tipo: "golpe", daño: 8 },
+      { tell: "Espera una respuesta a algo que no preguntó.", tipo: "efecto", efecto: "confusion" },
+      { tell: "Se te acaba el tiempo.", tipo: "golpe", daño: 10 },
     ],
   },
 
@@ -126,31 +102,19 @@ export const ENEMIGOS: Record<string, Enemigo> = {
   libro: {
     id: "libro",
     nombre: "un libro que no termina",
-    vida: 26,
-    debilidad: "resolver",
-    xp: 11,
+    vida: 28,
     patron: [
       { tell: "Pasa una página sola.", tipo: "espera" },
-      { tell: "Te nombra.", tipo: "golpe", daño: 10 },
-      {
-        tell: "La página que leíste ya dice otra cosa.",
-        tipo: "efecto",
-        efecto: "confusion",
-      },
+      { tell: "Te nombra.", tipo: "golpe", daño: 13 },
+      { tell: "La página que leíste ya dice otra cosa.", tipo: "efecto", efecto: "confusion" },
     ],
   },
   narrador: {
     id: "narrador",
     nombre: "el narrador",
-    vida: 20,
-    debilidad: "aguantar",
-    xp: 12,
+    vida: 24,
     patron: [
-      {
-        tell: "Describe lo que vas a hacer antes de que lo hagas.",
-        tipo: "golpe",
-        daño: 7,
-      },
+      { tell: "Describe lo que vas a hacer antes de que lo hagas.", tipo: "golpe", daño: 8 },
       { tell: "Se corrige.", tipo: "efecto", efecto: "confusion" },
     ],
   },
@@ -159,24 +123,20 @@ export const ENEMIGOS: Record<string, Enemigo> = {
   vuelve: {
     id: "vuelve",
     nombre: "algo que ya pasó y vuelve",
-    vida: 24,
-    debilidad: "aguantar",
-    xp: 11,
+    vida: 26,
     patron: [
-      { tell: "Ya hizo esto.", tipo: "golpe", daño: 7 },
+      { tell: "Ya hizo esto.", tipo: "golpe", daño: 8 },
       { tell: "Lo vas a ver otra vez.", tipo: "efecto", efecto: "miedo" },
-      { tell: "Ya hizo esto y lo va a hacer.", tipo: "golpe", daño: 10 },
+      { tell: "Ya hizo esto y lo va a hacer.", tipo: "golpe", daño: 13 },
     ],
   },
   fecha: {
     id: "fecha",
     nombre: "la fecha que no te acordás",
-    vida: 16,
-    debilidad: "resolver",
-    xp: 8,
+    vida: 18,
     patron: [
       { tell: "Te mira esperando el número.", tipo: "efecto", efecto: "miedo" },
-      { tell: "Se cansa de esperar.", tipo: "golpe", daño: 9 },
+      { tell: "Se cansa de esperar.", tipo: "golpe", daño: 11 },
     ],
   },
 
@@ -184,24 +144,20 @@ export const ENEMIGOS: Record<string, Enemigo> = {
   esqueleto: {
     id: "esqueleto",
     nombre: "el esqueleto del aula",
-    vida: 30,
-    debilidad: "esquivar",
-    xp: 13,
+    vida: 32,
     patron: [
       { tell: "Se descuelga del soporte.", tipo: "espera" },
-      { tell: "Se acomoda las manos.", tipo: "golpe", daño: 11 },
+      { tell: "Se acomoda las manos.", tipo: "golpe", daño: 14 },
       { tell: "Te muestra dónde te falta algo.", tipo: "efecto", efecto: "miedo" },
     ],
   },
   formol: {
     id: "formol",
     nombre: "lo que está en formol",
-    vida: 22,
-    debilidad: "aguantar",
-    xp: 12,
+    vida: 24,
     patron: [
       { tell: "Se da vuelta adentro del frasco.", tipo: "efecto", efecto: "miedo" },
-      { tell: "El vidrio cede un poco.", tipo: "golpe", daño: 8 },
+      { tell: "El vidrio cede un poco.", tipo: "golpe", daño: 10 },
     ],
   },
 
@@ -209,24 +165,20 @@ export const ENEMIGOS: Record<string, Enemigo> = {
   reaccion: {
     id: "reaccion",
     nombre: "algo que reacciona",
-    vida: 20,
-    debilidad: "esquivar",
-    xp: 11,
+    vida: 22,
     patron: [
       { tell: "Empieza a burbujear.", tipo: "espera" },
-      { tell: "Se expande.", tipo: "golpe", daño: 12 },
+      { tell: "Se expande.", tipo: "golpe", daño: 15 },
       { tell: "El aire se pone denso.", tipo: "efecto", efecto: "torpeza" },
     ],
   },
   campana: {
     id: "campana",
     nombre: "la campana de gases",
-    vida: 26,
-    debilidad: "aguantar",
-    xp: 12,
+    vida: 28,
     patron: [
       { tell: "El extractor se para.", tipo: "efecto", efecto: "torpeza" },
-      { tell: "Se llena.", tipo: "golpe", daño: 9 },
+      { tell: "Se llena.", tipo: "golpe", daño: 11 },
     ],
   },
 
@@ -234,80 +186,116 @@ export const ENEMIGOS: Record<string, Enemigo> = {
   ultimo: {
     id: "ultimo",
     nombre: "el que elige último",
-    vida: 24,
-    debilidad: "aguantar",
-    xp: 11,
+    vida: 26,
     patron: [
       { tell: "Todavía no dijo tu nombre.", tipo: "efecto", efecto: "torpeza" },
-      { tell: "Sigue sin decirlo.", tipo: "golpe", daño: 8 },
-      { tell: "Señala a otro.", tipo: "golpe", daño: 11 },
+      { tell: "Sigue sin decirlo.", tipo: "golpe", daño: 9 },
+      { tell: "Señala a otro.", tipo: "golpe", daño: 13 },
     ],
   },
   soga: {
     id: "soga",
     nombre: "la soga",
-    vida: 18,
-    debilidad: "esquivar",
-    xp: 9,
+    vida: 20,
     patron: [
-      { tell: "Se tensa.", tipo: "golpe", daño: 7 },
+      { tell: "Se tensa.", tipo: "golpe", daño: 9 },
       { tell: "Baja hasta donde llegás.", tipo: "efecto", efecto: "torpeza" },
+    ],
+  },
+
+  // --- Los profesores. Cierran el ciclo y no se pueden esquivar. ---
+  prof_matematica: {
+    id: "prof_matematica",
+    nombre: "el que corrige en rojo",
+    vida: 55,
+    profesor: true,
+    patron: [
+      { tell: "Destapa la lapicera.", tipo: "espera" },
+      { tell: "Tacha algo tuyo.", tipo: "golpe", daño: 16 },
+      { tell: "Te muestra la hoja.", tipo: "efecto", efecto: "confusion" },
+      { tell: "Sigue corrigiendo.", tipo: "golpe", daño: 20 },
+    ],
+  },
+  prof_biologia: {
+    id: "prof_biologia",
+    nombre: "la que sabe cómo sos por dentro",
+    vida: 58,
+    profesor: true,
+    patron: [
+      { tell: "Te pide que te quedes quieto.", tipo: "efecto", efecto: "miedo" },
+      { tell: "Señala exactamente el lugar.", tipo: "golpe", daño: 18 },
+      { tell: "Espera a que respires.", tipo: "espera" },
+      { tell: "Ahí.", tipo: "golpe", daño: 22 },
+    ],
+  },
+  prof_quimica: {
+    id: "prof_quimica",
+    nombre: "el que no se saca los guantes",
+    vida: 52,
+    profesor: true,
+    patron: [
+      { tell: "Mide algo sin mirar.", tipo: "espera" },
+      { tell: "Lo vuelca.", tipo: "golpe", daño: 19 },
+      { tell: "El aire se pone denso.", tipo: "efecto", efecto: "torpeza" },
+    ],
+  },
+  prof_historia: {
+    id: "prof_historia",
+    nombre: "el que estuvo ahí",
+    vida: 56,
+    profesor: true,
+    patron: [
+      { tell: "Se acuerda de vos.", tipo: "efecto", efecto: "miedo" },
+      { tell: "Cuenta cómo termina.", tipo: "golpe", daño: 17 },
+      { tell: "Lo cuenta otra vez.", tipo: "golpe", daño: 17 },
+    ],
+  },
+  prof_literatura: {
+    id: "prof_literatura",
+    nombre: "la que te lee en voz alta",
+    vida: 50,
+    profesor: true,
+    patron: [
+      { tell: "Abre el cuaderno en tu página.", tipo: "espera" },
+      { tell: "Empieza a leer.", tipo: "golpe", daño: 15 },
+      { tell: "Todos escuchan.", tipo: "efecto", efecto: "confusion" },
+      { tell: "Sigue leyendo.", tipo: "golpe", daño: 21 },
+    ],
+  },
+  prof_fisica: {
+    id: "prof_fisica",
+    nombre: "el que cuenta hasta diez",
+    vida: 54,
+    profesor: true,
+    patron: [
+      { tell: "Ocho.", tipo: "espera" },
+      { tell: "Nueve.", tipo: "efecto", efecto: "torpeza" },
+      { tell: "Diez.", tipo: "golpe", daño: 24 },
     ],
   },
 };
 
+export const PROFESORES = Object.keys(ENEMIGOS).filter(
+  (id) => ENEMIGOS[id].profesor,
+);
+
 export const ARMAS: Record<string, Arma> = {
-  regla: { id: "regla", nombre: "la regla", daño: 7, texto: "Medís y cortás." },
-  compas: {
-    id: "compas",
-    nombre: "el compás",
-    daño: 10,
-    texto: "La punta entra donde tiene que entrar.",
-  },
-  diccionario: {
-    id: "diccionario",
-    nombre: "el diccionario",
-    daño: 8,
-    texto: "Pesa más de lo que debería.",
-  },
-  puntero: {
-    id: "puntero",
-    nombre: "el puntero",
-    daño: 8,
-    texto: "Señalás y lo que señalás retrocede.",
-  },
-  bisturi: {
-    id: "bisturi",
-    nombre: "el bisturí",
-    daño: 12,
-    texto: "Abrís sin resistencia.",
-  },
-  mechero: {
-    id: "mechero",
-    nombre: "el mechero",
-    daño: 9,
-    texto: "La llama se estira hacia lo que mirás.",
-  },
-  acido: {
-    id: "acido",
-    nombre: "el ácido",
-    daño: 13,
-    texto: "Lo que toca deja de tener forma.",
-  },
-  pelota: {
-    id: "pelota",
-    nombre: "la pelota",
-    daño: 6,
-    texto: "Pega y vuelve a tu mano.",
-  },
+  regla: { id: "regla", nombre: "la regla", daño: 14, usos: 5, texto: "Medís y cortás." },
+  compas: { id: "compas", nombre: "el compás", daño: 18, usos: 4, texto: "La punta entra donde tiene que entrar." },
+  diccionario: { id: "diccionario", nombre: "el diccionario", daño: 15, usos: 5, texto: "Pesa más de lo que debería." },
+  puntero: { id: "puntero", nombre: "el puntero", daño: 16, usos: 5, texto: "Señalás y lo que señalás retrocede." },
+  bisturi: { id: "bisturi", nombre: "el bisturí", daño: 22, usos: 3, texto: "Abrís sin resistencia." },
+  mechero: { id: "mechero", nombre: "el mechero", daño: 17, usos: 4, texto: "La llama se estira hacia lo que mirás." },
+  acido: { id: "acido", nombre: "el ácido", daño: 25, usos: 2, texto: "Lo que toca deja de tener forma." },
+  pelota: { id: "pelota", nombre: "la pelota", daño: 12, usos: 7, texto: "Pega y vuelve a tu mano." },
 };
 
 export const ITEMS: Record<string, Item> = {
   agua: {
     id: "agua",
     nombre: "la botella",
-    descripcion: "Tomar algo. Recuperás 12.",
-    efecto: { vida: 12 },
+    descripcion: "Recuperás 15.",
+    efecto: { vida: 15 },
   },
   apunte: {
     id: "apunte",
@@ -317,15 +305,15 @@ export const ITEMS: Record<string, Item> = {
   },
   caramelo: {
     id: "caramelo",
-    nombre: "el caramelo del fondo del bolsillo",
-    descripcion: "Poca cosa. Recuperás 6.",
-    efecto: { vida: 6 },
+    nombre: "el caramelo del bolsillo",
+    descripcion: "Recuperás 8.",
+    efecto: { vida: 8 },
   },
   tiza: {
     id: "tiza",
     nombre: "la tiza",
-    descripcion: "Se la tirás. 10 de daño.",
-    efecto: { daño: 10 },
+    descripcion: "Se la tirás. 12 de daño.",
+    efecto: { daño: 12 },
   },
 };
 
