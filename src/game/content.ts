@@ -314,7 +314,7 @@ export const ITEMS: Record<string, Item> = {
   apunte: {
     id: "apunte",
     nombre: "el apunte de otro",
-    descripcion: "Letra ajena, pero clara. Te saca lo que tengas encima.",
+    descripcion: "Letra ajena, pero clara. Te saca los estados que tengas encima.",
     precision: 0.95,
     efecto: { limpia: true },
   },

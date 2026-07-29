@@ -93,7 +93,18 @@ export default function Juego() {
   return (
     <>
       {evento}
-      <main className="grano mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
+      {/*
+        El combate entra entero en la pantalla y no se scrollea: mirar para
+        abajo en medio de un turno es perder el hilo de lo que está pasando.
+        El resto de las pantallas sí puede crecer.
+      */}
+      <main
+        className={`grano mx-auto flex w-full max-w-xl flex-col px-5 ${
+          state.fase === "combate"
+            ? "h-dvh gap-3 overflow-hidden py-4"
+            : "flex-1 gap-5 py-8"
+        }`}
+      >
         {state.fase !== "sueño" && (
           <Cabecera state={state} vidaMostrada={actual?.vidaJugador} />
         )}
@@ -566,7 +577,7 @@ function Sprite({
   return (
     <Pixeles
       data={SPRITES[materiaId] ?? SPRITES.matematica}
-      clase={`w-40 text-agua ${clase}`}
+      clase={`w-24 sm:w-28 text-agua ${clase}`}
       muriendo={muriendo}
     />
   );
@@ -586,7 +597,7 @@ function EnPie({
     <div className="flex flex-col items-center">
       <Sprite materiaId={materiaId} clase={clase} muriendo={muriendo} />
       <div
-        className={`mt-2 h-2 w-28 rounded-[50%] bg-agua/15 blur-[2px] transition-opacity duration-700 ${
+        className={`mt-1.5 h-1.5 w-20 rounded-[50%] bg-agua/15 blur-[2px] transition-opacity duration-700 ${
           muriendo ? "opacity-0" : "opacity-100"
         }`}
       />
@@ -663,7 +674,7 @@ function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number
   const c = confundido(state);
   const vida = vidaMostrada ?? j.vida;
   return (
-    <header className="space-y-2">
+    <header className="shrink-0 space-y-2">
       <div className="flex items-baseline justify-between text-sm tracking-widest text-dim">
         <span className="text-agua">
           CICLO {state.ciclo}/{CICLOS}
@@ -815,7 +826,7 @@ function EventoEnLinea({
   return (
     <div
       key={`${k}-${entrada.texto}`}
-      className={`aparece flex min-h-20 flex-col justify-center gap-1.5 border-l-2 px-4 py-3 ${
+      className={`aparece flex min-h-18 shrink-0 flex-col justify-center gap-1 border-l-2 px-4 py-2.5 ${
         entrada.aviso ? "border-agua bg-agua/5" : "border-agua-hondo"
       }`}
     >
@@ -905,7 +916,7 @@ function Combate({
     ...j.sombras.map((id, i) => ({
       ref: `sombra:${id}`,
       key: `s${i}`,
-      texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`,
+      texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los estados que tengas encima`,
       clase: "text-sueno",
     })),
     ...j.poderes
@@ -921,7 +932,7 @@ function Combate({
   const usables = armasUsables(state);
 
   return (
-    <section className="space-y-4">
+    <section className="flex min-h-0 flex-1 flex-col gap-3">
       {/* Destello en toda la pantalla: te entró. */}
       {herido > 0 && (
         <div
@@ -932,7 +943,7 @@ function Combate({
 
       <div
         key={`herido-${herido}`}
-        className={`flex flex-col items-center gap-3 border p-6 ${
+        className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-2 border p-4 ${
           enemigo.profesor
             ? "border-malo bg-[radial-gradient(ellipse_at_center,rgba(226,104,92,0.09),transparent_70%)]"
             : "border-borde bg-[radial-gradient(ellipse_at_center,rgba(63,217,196,0.05),transparent_70%)]"
@@ -955,14 +966,14 @@ function Combate({
       {actual && !actual.icono ? (
         <EventoEnLinea entrada={actual} k={restantes} numeros={numerosDe(intencion)} />
       ) : (
-        <div className="flex min-h-20 flex-col justify-center gap-1.5 border-l-2 border-agua px-4 py-3">
+        <div className="flex min-h-18 shrink-0 flex-col justify-center gap-1 border-l-2 border-agua px-4 py-2.5">
           <span className="text-xs tracking-[0.35em] text-dim">VA A HACER</span>
           <p className="text-base leading-snug text-agua">{intencion.tell}</p>
           <p className="text-sm text-dim">{numerosDe(intencion)}</p>
         </div>
       )}
 
-      <div className={`grid grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
+      <div className={`grid shrink-0 grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
         <Boton
           label="ATACAR"
           sub={`${DAÑO_ATAQUE} · ${pct(PRECISION_ATAQUE)}%`}
@@ -988,7 +999,7 @@ function Combate({
       </div>
 
       {menu === "armas" && !contando && (
-        <div className="space-y-1 border border-dimmer p-3">
+        <div className="max-h-32 shrink-0 space-y-1 overflow-y-auto border border-borde p-3">
           {usables.map((id) => (
             <button
               key={id}
@@ -1004,7 +1015,7 @@ function Combate({
       )}
 
       {menu === "usar" && !contando && (
-        <div className="space-y-1 border border-dimmer p-3">
+        <div className="max-h-32 shrink-0 space-y-1 overflow-y-auto border border-borde p-3">
           {guardado.map((g) => (
             <button
               key={g.key}
@@ -1079,7 +1090,7 @@ function describirBotin(b: State["botin"][number]): {
     case "sombra":
       return {
         nombre: `la sombra de ${ENEMIGOS[b.id].nombre}`,
-        que: "Te saca de encima todos los estados.",
+        que: "Te saca los estados que tengas encima.",
         como: "Se usa desde USAR. Es de un solo uso y no vuelve.",
       };
     case "vida":

@@ -28,7 +28,7 @@ export const PODERES: Record<string, Poder> = {
   lucidez: {
     id: "lucidez",
     nombre: "Lucidez",
-    texto: "Por un momento ves con claridad. Te saca todo lo que tengas encima.",
+    texto: "Por un momento ves con claridad. Te saca los estados que tengas encima.",
     usos: 2,
     precision: 0.95,
     efecto: { limpia: true },
@@ -52,7 +52,7 @@ export const PODERES: Record<string, Poder> = {
   campana: {
     id: "campana",
     nombre: "El timbre",
-    texto: "Suena antes de tiempo. 16 de daño y te saca los efectos.",
+    texto: "Suena antes de tiempo. 16 de daño y te saca los estados que tengas encima.",
     usos: 1,
     precision: 0.85,
     efecto: { daño: 16, limpia: true },
