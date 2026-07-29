@@ -60,6 +60,22 @@ sostiene la estrategia larga de la run.
 
 Verificado con 10 invariantes automáticas sobre 1500 partidas.
 
+### Salas icónicas
+
+Cada materia da **siempre lo suyo**. No es una limitación: es lo que hace que en
+la run número diez sepas que Biología cura y Química lastima, y elijas el
+pasillo con esa información. La primera partida es a ciegas; de ahí en más lo
+que sabés es una herramienta.
+
+| Materia | Armas | Items |
+|---|---|---|
+| Matemática | la regla, el compás | la tiza |
+| Literatura | el diccionario | el apunte de otro |
+| Historia | el puntero | el apunte, el caramelo |
+| Biología | el bisturí | la venda, la botella |
+| Química | el mechero, el ácido | el alcohol, la tiza |
+| Ed. Física | la pelota | la botella, el caramelo |
+
 ### Armas
 
 Hasta **3 a la vez**. Cada una con sus usos por pelea, su precisión, su
@@ -70,6 +86,11 @@ daño. Las de usos contados son picos que hay que elegir cuándo gastar.
 Con la mochila llena, encontrar una cuarta obliga a soltar una. No se sale del
 aula sin decidir.
 
+**La pelota** es infinita pero no eterna: cada golpe que *entra* tiene un 5% de
+que rebote mal y la pierdas para siempre. Si el golpe erró no se tira esa
+chance — no hubo rebote que perder. Esa regla de orden es lo que hace que la
+pérdida se sienta justa en vez de arbitraria.
+
 ## Combate
 
 Cinco acciones y **ninguna estadística detrás**. La decisión no es "cuál pega
@@ -78,7 +99,7 @@ más" sino "qué corresponde ahora".
 | Acción | Qué hace |
 |---|---|
 | **ATACAR** | 6 de daño. A mano limpia no le hacés gran cosa a esto |
-| **ESPERAR** | Te cubrís. Si el golpe llega, **contraatacás por 15** |
+| **BLOQUEAR** | 85% de parar el golpe. Si sale, lo reducís al 20% **y le devolvés 23** |
 | **ARMA** | Daño alto y usos contados **por pelea**. Es lo que hacés en los turnos en que no te cubrís |
 | **USAR** | Item, sombra o poder |
 | **HUIR** | Salís al pasillo. Contra un profesor la puerta no abre |

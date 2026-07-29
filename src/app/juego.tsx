@@ -7,6 +7,7 @@ import {
   confundido,
   DAÑO_ATAQUE,
   DAÑO_CONTRA,
+  EFECTIVIDAD_BLOQUEO,
   armasUsables,
   factorMiedo,
   initialState,
@@ -852,9 +853,9 @@ function Combate({
           onClick={() => act("atacar")}
         />
         <Boton
-          label="ESPERAR"
-          sub={`cubrirte · devolver ${DAÑO_CONTRA}`}
-          onClick={() => act("esperar")}
+          label="BLOQUEAR"
+          sub={`para el golpe y devolvés ${DAÑO_CONTRA} · ${Math.round(EFECTIVIDAD_BLOQUEO * 100)}%`}
+          onClick={() => act("bloquear")}
         />
         <Boton
           label={usables.length ? "ARMA" : "SIN ARMA"}

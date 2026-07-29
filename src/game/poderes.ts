@@ -59,6 +59,19 @@ export const PODERES: Record<string, Poder> = {
   },
 };
 
+/**
+ * Devolver un golpe sin haber bloqueado sólo pasa en sueños. Es el poder que
+ * te deja hacer con una acción lo que despierto requiere leer el aviso bien.
+ */
+PODERES.espejo = {
+  id: "espejo",
+  nombre: "Espejo",
+  texto: "Le devolvés algo que no llegó a pegarte. 30 de daño.",
+  usos: 1,
+  precision: 0.9,
+  efecto: { daño: 30 },
+};
+
 export const DEFECTOS: Record<string, Defecto> = {
   manos_frias: {
     id: "manos_frias",

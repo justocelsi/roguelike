@@ -36,7 +36,7 @@ export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 6);
  * Sin esto, leer bien el aviso te costaba la mitad de tu daño y esperar era
  * siempre una pérdida.
  */
-export const DAÑO_CONTRA = 15;
+export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 23);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -46,7 +46,11 @@ export const DAÑO_CONTRA = 15;
  * Las dos acciones que premian leer bien el aviso son las que mejor apuntan.
  */
 export const PRECISION_ATAQUE = 0.92;
-export const PRECISION_CONTRA = 0.9;
+/**
+ * Bloquear no siempre sale. Cuando sale, para el golpe **y** le devolvés:
+ * es una sola tirada y un solo resultado, para que se entienda de una.
+ */
+export const EFECTIVIDAD_BLOQUEO = 0.85;
 /** Ningún arma baja de acá por más gastada que esté. */
 const PRECISION_MINIMA = 0.35;
 
@@ -274,36 +278,34 @@ function turnoEnemigo(state: State, rng: Rng): State {
   const tope = state.log[0];
 
   const acierta = random(rng) <= (intencion.precision ?? 0.85);
-  /** Te cubriste: aunque no te toque, quedaste parado para devolver. */
-  const devolver = () => {
-    if (!c.esperando) return;
-    const d = aplicarDaño(s, DAÑO_CONTRA);
-    if (random(rng) > PRECISION_CONTRA) {
-      s = { ...s, log: logEstado(s, "Tirás a devolver y no llegás.", "neutral") };
-    } else {
-      s = dañar(s, d);
-      s = { ...s, log: logEstado(s, `Se abrió. Le devolvés ${d}.`, "bueno") };
-    }
-  };
+  /** Si te pusiste a bloquear, una sola tirada decide todo el resultado. */
+  const bloqueaBien = c.bloqueando && random(rng) <= EFECTIVIDAD_BLOQUEO;
 
   if (intencion.tipo === "golpe") {
     if (!acierta) {
       s = { ...s, log: logEstado(s, "Va hacia vos y pasa de largo.", "neutral") };
-      devolver();
+      if (bloqueaBien) {
+        const d = aplicarDaño(s, DAÑO_CONTRA);
+        s = dañar(s, d);
+        s = { ...s, log: logEstado(s, `Igual estabas firme. Le devolvés ${d}.`, "bueno") };
+      }
     } else {
       // El impacto se cuenta primero y todavía no cuesta nada: el número, y
       // con él la barra, llegan en el evento siguiente.
       let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
       s = { ...s, log: logEstado(s, intencion.impacto ?? "Te alcanza.", "enemigo") };
-      if (c.esperando) daño = Math.max(1, Math.round(daño * 0.2));
+      if (bloqueaBien) daño = Math.max(1, Math.round(daño * 0.2));
       s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
-      s = {
-        ...s,
-        log: c.esperando
-          ? logEstado(s, `Lo viste venir: sólo −${daño}.`, "bueno")
-          : logEstado(s, `De lleno. −${daño}.`, "malo"),
-      };
-      if (c.esperando) devolver();
+      if (bloqueaBien) {
+        s = { ...s, log: logEstado(s, `Lo bloqueás. Sólo −${daño}.`, "bueno") };
+        const d = aplicarDaño(s, DAÑO_CONTRA);
+        s = dañar(s, d);
+        s = { ...s, log: logEstado(s, `Y le devolvés ${d}.`, "bueno") };
+      } else if (c.bloqueando) {
+        s = { ...s, log: logEstado(s, `No llegás a bloquearlo. −${daño}.`, "malo") };
+      } else {
+        s = { ...s, log: logEstado(s, `De lleno. −${daño}.`, "malo") };
+      }
     }
   } else if (intencion.tipo === "efecto" && intencion.efecto) {
     if (!acierta) {
@@ -334,7 +336,7 @@ function turnoEnemigo(state: State, rng: Rng): State {
   return {
     ...s,
     log: firmado,
-    combate: { ...s.combate!, paso: c.paso + 1, esperando: false },
+    combate: { ...s.combate!, paso: c.paso + 1, bloqueando: false },
   };
 }
 
@@ -414,9 +416,9 @@ function ganarCombate(state: State, rng: Rng): State {
       l = log(l, `Hay ${arma.nombre}. ${cuenta}. No te entra nada más.`, "neutral");
     }
   } else if (jugador.items.length < 6) {
-    // A veces cae más de uno; se listan con su cantidad.
+    // Cada materia da siempre lo suyo: por eso se puede aprender qué esperar.
     const cuantos = random(rng) < 0.25 ? 2 : 1;
-    const itemId = pick(rng, ITEM_IDS);
+    const itemId = pick(rng, materia?.items ?? ITEM_IDS);
     const caben = Math.min(cuantos, 6 - jugador.items.length);
     jugador = { ...jugador, items: [...jugador.items, ...Array(caben).fill(itemId)] };
     botin.push({ tipo: "item", id: itemId, cantidad: caben });
@@ -509,7 +511,7 @@ function apply(state: State, action: Action, rng: Rng): State {
           vida: vidaEnemigo,
           vidaMax: vidaEnemigo,
           paso: 0,
-          esperando: false,
+          bloqueando: false,
           // Los usos de armas y poderes vuelven enteros en cada aula.
           armasUsadas: {},
           poderesUsados: {},
@@ -636,7 +638,7 @@ function turnoDeCombate(
     return cerrarTurno(s, rng);
   }
 
-  let esperando = false;
+  let bloqueando = false;
 
   switch (accion) {
     case "atacar": {
@@ -649,8 +651,8 @@ function turnoDeCombate(
       s = { ...s, log: logEstado(s, `Le pegás. ${d}.`, "neutral") };
       break;
     }
-    case "esperar": {
-      esperando = true;
+    case "bloquear": {
+      bloqueando = true;
       s = { ...s, log: logEstado(s, "Te cubrís y esperás.", "neutral") };
       break;
     }
@@ -675,6 +677,7 @@ function turnoDeCombate(
       };
 
       if (!acierta) {
+        // Errar es errar: no se tira la pérdida porque no hubo golpe.
         s = { ...s, log: logEstado(s, `${arma.nombre} pasa al lado.`, "malo") };
       } else {
         const d = aplicarDaño(s, critico ? arma.daño * 2 : arma.daño);
@@ -687,6 +690,20 @@ function turnoDeCombate(
             "bueno",
           ),
         };
+        // Recién ahora, y sólo porque entró, puede perderse en el rebote.
+        if (arma.perdida && random(rng) <= arma.perdida) {
+          s = {
+            ...s,
+            jugador: {
+              ...s.jugador,
+              armas: s.jugador.armas.filter((a) => a !== armaId),
+            },
+          };
+          s = {
+            ...s,
+            log: logEstado(s, `${arma.nombre} rebota mal y no vuelve.`, "malo"),
+          };
+        }
       }
       break;
     }
@@ -776,7 +793,7 @@ function turnoDeCombate(
     }
   }
 
-  s = { ...s, combate: { ...s.combate!, esperando } };
+  s = { ...s, combate: { ...s.combate!, bloqueando } };
   if (s.combate!.vida <= 0) return ganarCombate(s, rng);
   return cerrarTurno(s, rng);
 }

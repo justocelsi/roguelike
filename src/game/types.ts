@@ -8,7 +8,7 @@ export type Efecto = "confusion" | "miedo" | "torpeza";
  * Cinco acciones y ninguna estadística detrás. Toda acción consume un turno.
  * La decisión no es "cuál pega más" sino "qué corresponde ahora".
  */
-export type Accion = "atacar" | "esperar" | "arma" | "usar" | "huir";
+export type Accion = "atacar" | "bloquear" | "arma" | "usar" | "huir";
 
 // --- contenido ------------------------------------------------------------
 
@@ -17,7 +17,13 @@ export type Materia = {
   nombre: string;
   efecto: Efecto;
   enemigos: string[];
+  /**
+   * Cada materia da siempre lo mismo. No es una limitación: es lo que hace
+   * que en la run número diez sepas que Biología cura y Química lastima, y
+   * elijas el pasillo con esa información.
+   */
   armas: string[];
+  items: string[];
 };
 
 /** Lo que el enemigo va a hacer el turno que viene. Se telegrafía siempre. */
@@ -50,6 +56,11 @@ export type Arma = {
   usos: number;
   /** Las que no se gastan: menos daño, pero están siempre. */
   infinita?: boolean;
+  /**
+   * Chance de perderla para siempre al acertar un golpe. Sólo se tira si el
+   * golpe entró: si erraste, no hubo rebote que perder.
+   */
+  perdida?: number;
   /** 0..1 con el arma entera. Cuanto más pega, menos acierta. */
   precision: number;
   /** Cuánta precisión pierde por cada uso, dentro de la pelea. */
@@ -99,7 +110,7 @@ export type Combate = {
   vida: number;
   vidaMax: number;
   paso: number;
-  esperando: boolean;
+  bloqueando: boolean;
   /**
    * Lo que se recarga en cada pelea: los usos de cada arma y de cada poder.
    * Los items y las sombras no están acá porque esos sí se gastan de verdad,
