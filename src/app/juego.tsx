@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ARMAS, ENEMIGOS, ITEMS, MATERIAS } from "@/game/content";
+import { ARMAS, ENEMIGOS, ITEMS } from "@/game/content";
 import {
   CICLOS,
   confundido,
@@ -15,6 +15,7 @@ import {
   CUERPO,
   PISO,
   PUERTA,
+  SALA,
   TILE,
   VELOCIDAD,
   mover,
@@ -24,8 +25,11 @@ import {
   type Puerta,
 } from "@/game/mundo";
 import { DEFECTOS, PODERES } from "@/game/poderes";
-import { SPRITES } from "@/game/sprites";
-import type { Accion, Action, State } from "@/game/types";
+import { ICONOS, SPRITES } from "@/game/sprites";
+import type { Accion, Action, Entrada, State } from "@/game/types";
+
+/** Cuánto tarda en aparecer cada línea del turno. */
+const RITMO = 750;
 
 export default function Juego() {
   const [state, setState] = useState<State | null>(null);
@@ -57,9 +61,7 @@ export default function Juego() {
         state={state}
         mundo={state.mundo}
         pos={pos}
-        onEntrar={(p) =>
-          dispatch({ type: "entrar-aula", puertaX: p.x, puertaY: p.y })
-        }
+        onEntrar={(p) => dispatch({ type: "entrar-aula", puertaX: p.x, puertaY: p.y })}
       />
     );
   }
@@ -68,9 +70,7 @@ export default function Juego() {
     <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
       {state.fase !== "sueño" && <Cabecera state={state} />}
       {state.fase === "combate" && <Combate state={state} dispatch={dispatch} />}
-      {state.fase === "recompensa" && (
-        <Recompensa state={state} dispatch={dispatch} />
-      )}
+      {state.fase === "recompensa" && <Recompensa state={state} dispatch={dispatch} />}
       {state.fase === "sueño" && <Sueño state={state} dispatch={dispatch} />}
       {(state.fase === "muerto" || state.fase === "fin") && (
         <Final
@@ -95,8 +95,7 @@ function Portada({ onStart }: { onStart: () => void }) {
         <p className="text-sm leading-relaxed text-dim">
           Hace tres días que no dormís bien.
           <br />
-          Ya no estás seguro de cuál de los dos mundos es el que te espera
-          despierto.
+          Ya no estás seguro de cuál de los dos mundos te espera despierto.
         </p>
       </div>
       <Sprite materiaId="biologia" clase="respira" />
@@ -111,6 +110,21 @@ function Portada({ onStart }: { onStart: () => void }) {
 }
 
 // --- el pasillo -----------------------------------------------------------
+
+/** Dibuja un glifo de texto (5×5) en el canvas. */
+function glifo(
+  ctx: CanvasRenderingContext2D,
+  data: string[],
+  x: number,
+  y: number,
+  px: number,
+) {
+  data.forEach((fila, gy) =>
+    fila.split("").forEach((ch, gx) => {
+      if (ch === "#") ctx.fillRect(x + gx * px, y + gy * px, px, px);
+    }),
+  );
+}
 
 function Pasillo({
   state,
@@ -185,6 +199,7 @@ function Pasillo({
       ctx.fillStyle = "#05100e";
       ctx.fillRect(camX, camY, anchoVista, altoVista);
 
+      // Piso del pasillo y aulas de fondo.
       for (let ty = 0; ty < mundo.alto; ty++) {
         for (let tx = 0; tx < mundo.ancho; tx++) {
           const t = tileEn(mundo, tx, ty);
@@ -193,14 +208,47 @@ function Pasillo({
             ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
             ctx.fillStyle = "#122a26";
             ctx.fillRect(tx * TILE, ty * TILE + TILE - 1, TILE, 1);
-          } else if (t === PUERTA) {
-            const pu = mundo.puertas.find((q) => q.x === tx && q.y === ty);
-            const usada = pu?.usada;
-            ctx.fillStyle = usada ? "#12332e" : pu?.profesor ? "#8a3b33" : "#1c6b60";
-            ctx.fillRect(tx * TILE + 2, ty * TILE + 3, TILE - 4, TILE - 3);
-            ctx.fillStyle = usada ? "#1c3f39" : pu?.profesor ? "#e2685c" : "#3fd9c4";
-            ctx.fillRect(tx * TILE + 2, ty * TILE + 3, TILE - 4, 2);
+          } else if (t === SALA) {
+            // El aula se ve a través de la pared, apagada.
+            ctx.fillStyle = ty % 2 === 0 ? "#091613" : "#0a1815";
+            ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
           }
+        }
+      }
+
+      // El símbolo de cada materia, difuminado, en el fondo de su aula.
+      for (const pu of mundo.puertas) {
+        const icono = ICONOS[pu.materiaId] ?? ICONOS.matematica;
+        const cx = ((pu.sala.x0 + pu.sala.x1 + 1) / 2) * TILE - 7.5;
+        const cy = ((pu.sala.y0 + pu.sala.y1 + 1) / 2) * TILE - 7.5;
+        ctx.globalAlpha = pu.usada ? 0.07 : 0.16;
+        ctx.fillStyle = pu.profesor ? "#e2685c" : "#3fd9c4";
+        glifo(ctx, icono, cx, cy, 3);
+        ctx.globalAlpha = 1;
+      }
+
+      // Las puertas, con forma de puerta.
+      for (const pu of mundo.puertas) {
+        const dx0 = pu.x * TILE;
+        const dy0 = pu.y * TILE;
+        const marco = pu.usada ? "#0f2a26" : pu.profesor ? "#5a231e" : "#12554c";
+        const hoja = pu.usada ? "#0b1f1c" : pu.profesor ? "#8a3b33" : "#1c6b60";
+        const detalle = pu.usada ? "#1c3f39" : pu.profesor ? "#e2685c" : "#3fd9c4";
+        ctx.fillStyle = marco;
+        ctx.fillRect(dx0 + 1, dy0 + 1, TILE - 2, TILE - 1);
+        ctx.fillStyle = hoja;
+        ctx.fillRect(dx0 + 3, dy0 + 3, TILE - 6, TILE - 3);
+        ctx.fillStyle = detalle;
+        // Picaporte y umbral.
+        ctx.fillRect(dx0 + TILE - 6, dy0 + 9, 2, 2);
+        ctx.fillRect(dx0 + 3, dy0 + 3, TILE - 6, 1);
+        // El cartel con el símbolo, del lado del pasillo.
+        const arriba = pu.y < 5;
+        const sy = arriba ? dy0 + TILE + 1 : dy0 - 7;
+        if (!pu.profesor) {
+          ctx.globalAlpha = pu.usada ? 0.3 : 1;
+          glifo(ctx, ICONOS[pu.materiaId] ?? ICONOS.matematica, dx0 + 5, sy, 1.2);
+          ctx.globalAlpha = 1;
         }
       }
 
@@ -235,7 +283,6 @@ function Pasillo({
           style={{ imageRendering: "pixelated" }}
         />
 
-        {/* Lo que hay detrás de la puerta se lee al pararte enfrente. */}
         {cerca && (
           <div className="absolute inset-x-0 bottom-0 border-t border-agua bg-background/95 p-3">
             {cerca.usada ? (
@@ -269,7 +316,7 @@ function Pasillo({
       </div>
 
       <p className="text-xs text-dim">
-        WASD o flechas · [E] para entrar · el fondo del pasillo es el profesor
+        WASD o flechas · [E] para entrar · al fondo del pasillo está el profesor
       </p>
       <Bitacora state={state} />
     </main>
@@ -302,7 +349,9 @@ function Sprite({ materiaId, clase = "" }: { materiaId: string; clase?: string }
 
 function Barra({ valor, max, color = "bg-agua" }: { valor: number; max: number; color?: string }) {
   const bloques = 24;
-  const llenos = Math.max(0, Math.round((valor / max) * bloques));
+  // Si seguís vivo tiene que verse algo: con 1 de vida el redondeo daba cero
+  // y la barra parecía vacía estando en pie.
+  const llenos = valor <= 0 ? 0 : Math.max(1, Math.round((valor / max) * bloques));
   return (
     <div className="flex gap-px">
       {Array.from({ length: bloques }, (_, i) => (
@@ -333,9 +382,7 @@ function Cabecera({ state }: { state: State }) {
         <span className="text-agua">
           CICLO {state.ciclo}/{CICLOS}
         </span>
-        <span>
-          {j.armaId ? `${ARMAS[j.armaId].nombre} ×${j.armaUsos}` : "sin arma"}
-        </span>
+        <span>{j.armaId ? `${ARMAS[j.armaId].nombre} ×${j.armaUsos}` : "sin arma"}</span>
       </div>
       <Barra valor={j.vida} max={j.vidaMax} />
       <div className="flex justify-between text-xs text-dim">
@@ -366,28 +413,99 @@ function Cabecera({ state }: { state: State }) {
 
 function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => void }) {
   const [menu, setMenu] = useState(false);
+  /** Cuántas de las líneas más nuevas todavía no se mostraron. */
+  const [ocultas, setOcultas] = useState(0);
+  const cabeza = useRef<Entrada | null | undefined>(undefined);
+  const [golpe, setGolpe] = useState(0);
+  const vidaEnemigoPrev = useRef<number | null>(null);
+  const vidaPrev = useRef(state.jugador.vida);
+  const [herido, setHerido] = useState(0);
+
   const c = state.combate;
+  const vidaEnemigo = c?.vida ?? null;
+
+  // El turno se cuenta solo: cada línea nueva aparece después de la anterior.
+  useEffect(() => {
+    const log = state.log;
+    if (cabeza.current === undefined) {
+      cabeza.current = log[0] ?? null;
+      return;
+    }
+    const i = cabeza.current ? log.indexOf(cabeza.current) : log.length;
+    const nuevas = i === -1 ? log.length : i;
+    cabeza.current = log[0] ?? null;
+    setOcultas(Math.max(0, nuevas - 1));
+  }, [state.log]);
+
+  useEffect(() => {
+    if (ocultas <= 0) return;
+    const t = setTimeout(() => setOcultas((o) => Math.max(0, o - 1)), RITMO);
+    return () => clearTimeout(t);
+  }, [ocultas]);
+
+  // Sacudida del enemigo cuando le entra, y del borde cuando te entra a vos.
+  useEffect(() => {
+    if (vidaEnemigo === null) return;
+    if (vidaEnemigoPrev.current !== null && vidaEnemigo < vidaEnemigoPrev.current) {
+      setGolpe((g) => g + 1);
+    }
+    vidaEnemigoPrev.current = vidaEnemigo;
+  }, [vidaEnemigo]);
+
+  useEffect(() => {
+    if (state.jugador.vida < vidaPrev.current) setHerido((h) => h + 1);
+    vidaPrev.current = state.jugador.vida;
+  }, [state.jugador.vida]);
+
   if (!c) return null;
   const enemigo = ENEMIGOS[c.enemigoId];
   const intencion = enemigo.patron[c.paso % enemigo.patron.length];
   const conf = confundido(state);
   const j = state.jugador;
+  const contando = ocultas > 0;
 
   const act = (accion: Accion, ref?: string) => {
+    if (contando) return;
     setMenu(false);
     dispatch({ type: "combate", accion, ref });
   };
 
   const guardado = [
-    ...j.items.map((id, i) => ({ ref: id, key: `i${i}`, texto: `${ITEMS[id].nombre} — ${ITEMS[id].descripcion}`, clase: "text-dim" })),
-    ...j.sombras.map((id, i) => ({ ref: `sombra:${id}`, key: `s${i}`, texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`, clase: "text-sueno" })),
-    ...j.poderes.filter((p) => p.usos > 0).map((p) => ({ ref: `poder:${p.id}`, key: p.id, texto: `${PODERES[p.id].nombre} ×${p.usos} — ${PODERES[p.id].texto}`, clase: "text-agua" })),
+    ...j.items.map((id, i) => ({
+      ref: id,
+      key: `i${i}`,
+      texto: `${ITEMS[id].nombre} — ${ITEMS[id].descripcion}`,
+      clase: "text-dim",
+    })),
+    ...j.sombras.map((id, i) => ({
+      ref: `sombra:${id}`,
+      key: `s${i}`,
+      texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`,
+      clase: "text-sueno",
+    })),
+    ...j.poderes
+      .filter((p) => p.usos > 0)
+      .map((p) => ({
+        ref: `poder:${p.id}`,
+        key: p.id,
+        texto: `${PODERES[p.id].nombre} ×${p.usos} — ${PODERES[p.id].texto}`,
+        clase: "text-agua",
+      })),
   ];
+
+  const visibles = state.log.slice(ocultas, ocultas + 3);
 
   return (
     <section className="space-y-4">
-      <div className={`flex flex-col items-center gap-3 border p-5 ${enemigo.profesor ? "border-malo" : "border-dimmer"}`}>
-        <Sprite materiaId={c.materiaId} clase="respira" />
+      <div
+        key={`herido-${herido}`}
+        className={`flex flex-col items-center gap-3 border p-5 ${
+          enemigo.profesor ? "border-malo" : "border-dimmer"
+        } ${herido > 0 ? "sacude" : ""}`}
+      >
+        <div key={`golpe-${golpe}`} className={golpe > 0 ? "sacude" : "respira"}>
+          <Sprite materiaId={c.materiaId} />
+        </div>
         <p className="text-center text-sm">{enemigo.nombre}</p>
         <div className="w-full space-y-1">
           <Barra valor={c.vida} max={c.vidaMax} color="bg-malo" />
@@ -400,22 +518,22 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
         </p>
       </div>
 
-      {/* Lo que acaba de pasar, pegado arriba de los botones. */}
-      <div className="min-h-14 space-y-0.5 border-l-2 border-agua-hondo pl-3">
-        {state.log.slice(0, 3).map((e, i) => (
+      {/* El turno, línea por línea, pegado arriba de los botones. */}
+      <div className="min-h-16 space-y-1 border-l-2 border-agua-hondo pl-3">
+        {visibles.map((e, i) => (
           <p
-            key={`${i}-${e.texto}`}
-            className={`text-xs leading-snug ${COLOR[e.tipo]}`}
-            style={{ opacity: i === 0 ? 1 : 0.45 - i * 0.1 }}
+            key={`${ocultas}-${i}-${e.texto}`}
+            className={`text-xs leading-snug ${COLOR[e.tipo]} ${i === 0 ? "aparece" : ""}`}
+            style={{ opacity: i === 0 ? 1 : 0.4 - i * 0.1 }}
           >
             {e.texto}
           </p>
         ))}
       </div>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className={`grid grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
         <Boton label="ATACAR" sub={`${DAÑO_ATAQUE}`} onClick={() => act("atacar")} />
-        <Boton label="ESPERAR" sub="te cubrís" onClick={() => act("esperar")} />
+        <Boton label="ESPERAR" sub="te cubrís · contraatacás" onClick={() => act("esperar")} />
         <Boton
           label={j.armaId ? ARMAS[j.armaId].nombre.toUpperCase() : "SIN ARMA"}
           sub={j.armaId ? `${ARMAS[j.armaId].daño} · quedan ${j.armaUsos}` : "—"}
@@ -430,7 +548,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
         />
       </div>
 
-      {menu && (
+      {menu && !contando && (
         <div className="space-y-1 border border-dimmer p-3">
           {guardado.map((g) => (
             <button
@@ -446,7 +564,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
 
       <button
         onClick={() => act("huir")}
-        disabled={!puedeHuir(state)}
+        disabled={!puedeHuir(state) || contando}
         className="w-full border border-dimmer p-2 text-xs tracking-widest text-dim hover:border-dim disabled:opacity-25"
       >
         {puedeHuir(state) ? "SALIR AL PASILLO" : "LA PUERTA NO ABRE"}
@@ -526,9 +644,7 @@ function Sueño({ state, dispatch }: { state: State; dispatch: (a: Action) => vo
                 <div className="text-sm font-bold">{poder.nombre}</div>
                 <p className="mt-1 text-xs text-[#4a625d]">{poder.texto}</p>
                 <div className="mt-3 border-t border-[#dde5e2] pt-3">
-                  <div className="text-xs font-bold text-[#a8443a]">
-                    {defecto.nombre}
-                  </div>
+                  <div className="text-xs font-bold text-[#a8443a]">{defecto.nombre}</div>
                   <p className="mt-1 text-xs text-[#4a625d]">{defecto.texto}</p>
                 </div>
               </button>
@@ -555,7 +671,9 @@ function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
       </p>
       <p className="text-sm leading-relaxed">{state.final}</p>
       <div className="space-y-1 border-t border-dimmer pt-4 text-xs text-dim">
-        <p>Llegaste al ciclo {state.ciclo} de {CICLOS}.</p>
+        <p>
+          Llegaste al ciclo {state.ciclo} de {CICLOS}.
+        </p>
         {state.jugador.defectos.length > 0 && (
           <p>Te llevaste: {state.jugador.defectos.map((d) => DEFECTOS[d].nombre).join(", ")}.</p>
         )}

@@ -186,6 +186,12 @@ function turnoEnemigo(state: State, rng: Rng): State {
   let contra = 0;
   if (intencion.tipo === "golpe") {
     let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
+    // Primero qué hizo, después qué te costó: son dos eventos distintos y la
+    // interfaz los muestra uno después del otro.
+    s = {
+      ...s,
+      log: log(s.log, intencion.impacto ?? "Te alcanza.", "enemigo"),
+    };
     if (c.esperando) {
       daño = Math.max(1, Math.round(daño * 0.2));
       contra = aplicarDaño(s, DAÑO_CONTRA);
@@ -193,12 +199,12 @@ function turnoEnemigo(state: State, rng: Rng): State {
         ...s,
         log: log(
           s.log,
-          `Lo viste venir. Entran ${daño} y le devolvés ${contra}.`,
+          `Lo viste venir: sólo −${daño}. Le devolvés ${contra}.`,
           "bueno",
         ),
       };
     } else {
-      s = { ...s, log: log(s.log, `Te alcanza de lleno. ${daño}.`, "malo") };
+      s = { ...s, log: log(s.log, `De lleno. −${daño}.`, "malo") };
     }
     s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
   } else if (intencion.tipo === "efecto" && intencion.efecto) {

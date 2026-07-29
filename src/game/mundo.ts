@@ -16,6 +16,11 @@ export const VELOCIDAD = 62; // px por segundo
 export const PISO = 0;
 export const PARED = 1;
 export const PUERTA = 2;
+/**
+ * Interior de un aula. No se camina: se ve. Se dibuja difuminado detrás de la
+ * pared para que el pasillo tenga profundidad y no sea un tubo.
+ */
+export const SALA = 3;
 
 export type Puerta = {
   x: number;
@@ -26,6 +31,8 @@ export type Puerta = {
   /** Lo que realmente hay. */
   sorteado: string;
   usada: boolean;
+  /** El rectángulo del aula que se ve detrás, en tiles. */
+  sala: { x0: number; y0: number; x1: number; y1: number };
   /**
    * La puerta del fondo. Siempre está abierta: podés ir derecho al profesor o
    * limpiar aulas antes para juntar armas. Esa es la decisión del pasillo.
@@ -88,34 +95,59 @@ export function generarPasillo(
 ): Mundo {
   const cantidadPuertas = opciones.cantidadPuertas ?? 5;
   const deformacion = opciones.deformacion ?? {};
-  const ancho = 8 + cantidadPuertas * 6;
+  const ancho = 12 + cantidadPuertas * 6;
   const alto = 13;
   const tiles = new Uint8Array(ancho * alto).fill(PARED);
 
-  // El pasillo es una banda horizontal.
+  // El pasillo es una banda horizontal. Termina antes del aula del profesor.
   const filaDesde = 5;
   const filaHasta = 7;
+  const finPasillo = ancho - 7;
   for (let y = filaDesde; y <= filaHasta; y++) {
-    for (let x = 1; x < ancho - 1; x++) tiles[y * ancho + x] = PISO;
+    for (let x = 1; x <= finPasillo; x++) tiles[y * ancho + x] = PISO;
   }
+
+  /** Carva el interior visible de un aula. */
+  const carvarSala = (x0: number, y0: number, x1: number, y1: number) => {
+    for (let y = y0; y <= y1; y++) {
+      for (let x = x0; x <= x1; x++) {
+        if (x > 0 && y > 0 && x < ancho - 1 && y < alto - 1) {
+          tiles[y * ancho + x] = SALA;
+        }
+      }
+    }
+  };
 
   const puertas: Puerta[] = [];
   for (let i = 0; i < cantidadPuertas; i++) {
     const x = 4 + i * 6;
     const arriba = i % 2 === 0;
     const y = arriba ? filaDesde - 1 : filaHasta + 1;
+    // El aula detrás de la puerta, que se ve difuminada desde el pasillo.
+    const sala = arriba
+      ? { x0: x - 2, y0: 1, x1: x + 2, y1: filaDesde - 2 }
+      : { x0: x - 2, y0: filaHasta + 2, x1: x + 2, y1: alto - 2 };
+    carvarSala(sala.x0, sala.y0, sala.x1, sala.y1);
     tiles[y * ancho + x] = PUERTA;
+
     const materiaId = pick(rng, MATERIA_IDS);
     const { lecturas, sorteado } = armarLecturas(
       rng,
       materiaId,
       deformacion[materiaId] ?? 0,
     );
-    puertas.push({ x, y, materiaId, lecturas, sorteado, usada: false });
+    puertas.push({ x, y, materiaId, lecturas, sorteado, usada: false, sala });
   }
 
-  // La puerta del fondo: el profesor. Siempre disponible.
-  const xFinal = ancho - 2;
+  // El aula del profesor: al fondo, ocupando todo el ancho que queda.
+  const salaProf = {
+    x0: finPasillo + 2,
+    y0: filaDesde - 2,
+    x1: ancho - 2,
+    y1: filaHasta + 2,
+  };
+  carvarSala(salaProf.x0, salaProf.y0, salaProf.x1, salaProf.y1);
+  const xFinal = finPasillo + 1;
   tiles[6 * ancho + xFinal] = PUERTA;
   const profesorId = pick(rng, PROFESORES);
   puertas.push({
@@ -125,6 +157,7 @@ export function generarPasillo(
     lecturas: [{ enemigoId: profesorId, prob: 1 }],
     sorteado: profesorId,
     usada: false,
+    sala: salaProf,
     profesor: true,
   });
 
@@ -145,7 +178,9 @@ function chocaEn(m: Mundo, px: number, py: number): boolean {
   const y1 = Math.floor((py + mitad - 0.01) / TILE);
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
-      if (tileEn(m, tx, ty) === PARED) return true;
+      const t = tileEn(m, tx, ty);
+      // Las aulas se ven pero no se caminan: se entra por la puerta.
+      if (t === PARED || t === SALA) return true;
     }
   }
   return false;

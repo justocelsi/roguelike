@@ -6,6 +6,19 @@
  * cuando la forma casi se reconoce.
  */
 
+/**
+ * Íconos de 5×5 para las puertas del pasillo. Un símbolo por materia, así el
+ * aula se reconoce de lejos sin leer el cartel.
+ */
+export const ICONOS: Record<string, string[]> = {
+  matematica: ["..#..", "..#..", "#####", "..#..", "..#.."],
+  literatura: [".....", "##.##", "#####", "##.##", "....."],
+  historia: ["#####", ".###.", "..#..", ".###.", "#####"],
+  biologia: [".###.", "#####", "#.#.#", "#####", ".#.#."],
+  quimica: [".###.", "..#..", "..#..", ".###.", "#####"],
+  fisica: [".###.", "##.##", "#.#.#", "##.##", ".###."],
+};
+
 export const SPRITES: Record<string, string[]> = {
   matematica: [
     "....####....",

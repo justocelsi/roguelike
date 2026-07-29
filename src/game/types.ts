@@ -22,8 +22,11 @@ export type Materia = {
 
 /** Lo que el enemigo va a hacer el turno que viene. Se telegrafía siempre. */
 export type Intencion = {
+  /** El aviso, un turno antes. Es lo que el jugador tiene que leer. */
   tell: string;
   tipo: "golpe" | "efecto" | "espera";
+  /** Qué se siente cuando efectivamente pasa. Distinto del aviso. */
+  impacto?: string;
   daño?: number;
   efecto?: Efecto;
 };

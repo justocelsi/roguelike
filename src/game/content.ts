@@ -73,9 +73,9 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     nombre: "un teorema que no cierra",
     vida: 26,
     patron: [
-      { tell: "Empieza a reescribirse.", tipo: "golpe", daño: 7 },
+      { tell: "Empieza a reescribirse.", tipo: "golpe", impacto: "Se reescribe encima tuyo. Algo que era cierto deja de serlo.", daño: 7 },
       { tell: "Se detiene. Falta un paso.", tipo: "efecto", efecto: "confusion" },
-      { tell: "Te muestra el resultado antes de la demostración.", tipo: "golpe", daño: 12 },
+      { tell: "Te muestra el resultado antes de la demostración.", tipo: "golpe", impacto: "Ves el final antes que el camino y ya no lo podés desver.", daño: 12 },
     ],
   },
   demostracion: {
@@ -83,9 +83,9 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     nombre: "una demostración circular",
     vida: 30,
     patron: [
-      { tell: "Vuelve al principio.", tipo: "golpe", daño: 6 },
+      { tell: "Vuelve al principio.", tipo: "golpe", impacto: "Volvés con él al mismo punto, sin haber avanzado.", daño: 6 },
       { tell: "Vuelve al principio.", tipo: "espera" },
-      { tell: "Vuelve al principio. Otra vez.", tipo: "golpe", daño: 14 },
+      { tell: "Vuelve al principio. Otra vez.", tipo: "golpe", impacto: "El círculo se cierra sobre vos.", daño: 14 },
     ],
   },
   problema: {
@@ -94,7 +94,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 20,
     patron: [
       { tell: "Espera una respuesta a algo que no preguntó.", tipo: "efecto", efecto: "confusion" },
-      { tell: "Se te acaba el tiempo.", tipo: "golpe", daño: 10 },
+      { tell: "Se te acaba el tiempo.", tipo: "golpe", impacto: "Te sacan la hoja. No habías escrito nada.", daño: 10 },
     ],
   },
 
@@ -105,7 +105,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 28,
     patron: [
       { tell: "Pasa una página sola.", tipo: "espera" },
-      { tell: "Te nombra.", tipo: "golpe", daño: 13 },
+      { tell: "Te nombra.", tipo: "golpe", impacto: "Dice tu nombre completo, con el segundo.", daño: 13 },
       { tell: "La página que leíste ya dice otra cosa.", tipo: "efecto", efecto: "confusion" },
     ],
   },
@@ -114,7 +114,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     nombre: "el narrador",
     vida: 24,
     patron: [
-      { tell: "Describe lo que vas a hacer antes de que lo hagas.", tipo: "golpe", daño: 8 },
+      { tell: "Describe lo que vas a hacer antes de que lo hagas.", tipo: "golpe", impacto: "Ya estaba escrito. Hacés exactamente eso.", daño: 8 },
       { tell: "Se corrige.", tipo: "efecto", efecto: "confusion" },
     ],
   },
@@ -125,9 +125,9 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     nombre: "algo que ya pasó y vuelve",
     vida: 26,
     patron: [
-      { tell: "Ya hizo esto.", tipo: "golpe", daño: 8 },
+      { tell: "Ya hizo esto.", tipo: "golpe", impacto: "Te pasa de nuevo, igual que la primera vez.", daño: 8 },
       { tell: "Lo vas a ver otra vez.", tipo: "efecto", efecto: "miedo" },
-      { tell: "Ya hizo esto y lo va a hacer.", tipo: "golpe", daño: 13 },
+      { tell: "Ya hizo esto y lo va a hacer.", tipo: "golpe", impacto: "Vuelve a pasar, y esta vez sabés cómo sigue.", daño: 13 },
     ],
   },
   fecha: {
@@ -136,7 +136,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 18,
     patron: [
       { tell: "Te mira esperando el número.", tipo: "efecto", efecto: "miedo" },
-      { tell: "Se cansa de esperar.", tipo: "golpe", daño: 11 },
+      { tell: "Se cansa de esperar.", tipo: "golpe", impacto: "Te dice el número ella. Era obvio.", daño: 11 },
     ],
   },
 
@@ -147,7 +147,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 32,
     patron: [
       { tell: "Se descuelga del soporte.", tipo: "espera" },
-      { tell: "Se acomoda las manos.", tipo: "golpe", daño: 14 },
+      { tell: "Se acomoda las manos.", tipo: "golpe", impacto: "Te agarra justo donde tenés lo mismo que él.", daño: 14 },
       { tell: "Te muestra dónde te falta algo.", tipo: "efecto", efecto: "miedo" },
     ],
   },
@@ -157,7 +157,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 24,
     patron: [
       { tell: "Se da vuelta adentro del frasco.", tipo: "efecto", efecto: "miedo" },
-      { tell: "El vidrio cede un poco.", tipo: "golpe", daño: 10 },
+      { tell: "El vidrio cede un poco.", tipo: "golpe", impacto: "Se derrama sobre vos y está tibio.", daño: 10 },
     ],
   },
 
@@ -168,7 +168,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 22,
     patron: [
       { tell: "Empieza a burbujear.", tipo: "espera" },
-      { tell: "Se expande.", tipo: "golpe", daño: 15 },
+      { tell: "Se expande.", tipo: "golpe", impacto: "Te llega el calor antes que el ruido.", daño: 15 },
       { tell: "El aire se pone denso.", tipo: "efecto", efecto: "torpeza" },
     ],
   },
@@ -178,7 +178,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 28,
     patron: [
       { tell: "El extractor se para.", tipo: "efecto", efecto: "torpeza" },
-      { tell: "Se llena.", tipo: "golpe", daño: 11 },
+      { tell: "Se llena.", tipo: "golpe", impacto: "Respirás algo que no era aire.", daño: 11 },
     ],
   },
 
@@ -189,8 +189,8 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 26,
     patron: [
       { tell: "Todavía no dijo tu nombre.", tipo: "efecto", efecto: "torpeza" },
-      { tell: "Sigue sin decirlo.", tipo: "golpe", daño: 9 },
-      { tell: "Señala a otro.", tipo: "golpe", daño: 13 },
+      { tell: "Sigue sin decirlo.", tipo: "golpe", impacto: "Te quedás parado mientras se arman los equipos.", daño: 9 },
+      { tell: "Señala a otro.", tipo: "golpe", impacto: "Señala a otro y todos miran para donde estás vos.", daño: 13 },
     ],
   },
   soga: {
@@ -198,7 +198,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     nombre: "la soga",
     vida: 20,
     patron: [
-      { tell: "Se tensa.", tipo: "golpe", daño: 9 },
+      { tell: "Se tensa.", tipo: "golpe", impacto: "Te levanta unos centímetros y te suelta.", daño: 9 },
       { tell: "Baja hasta donde llegás.", tipo: "efecto", efecto: "torpeza" },
     ],
   },
@@ -211,9 +211,9 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     profesor: true,
     patron: [
       { tell: "Destapa la lapicera.", tipo: "espera" },
-      { tell: "Tacha algo tuyo.", tipo: "golpe", daño: 16 },
+      { tell: "Tacha algo tuyo.", tipo: "golpe", impacto: "Tacha algo que habías hecho bien.", daño: 16 },
       { tell: "Te muestra la hoja.", tipo: "efecto", efecto: "confusion" },
-      { tell: "Sigue corrigiendo.", tipo: "golpe", daño: 20 },
+      { tell: "Sigue corrigiendo.", tipo: "golpe", impacto: "Sigue. La hoja te queda entera en rojo.", daño: 20 },
     ],
   },
   prof_biologia: {
@@ -223,9 +223,9 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     profesor: true,
     patron: [
       { tell: "Te pide que te quedes quieto.", tipo: "efecto", efecto: "miedo" },
-      { tell: "Señala exactamente el lugar.", tipo: "golpe", daño: 18 },
+      { tell: "Señala exactamente el lugar.", tipo: "golpe", impacto: "Apoya el dedo justo donde duele.", daño: 18 },
       { tell: "Espera a que respires.", tipo: "espera" },
-      { tell: "Ahí.", tipo: "golpe", daño: 22 },
+      { tell: "Ahí.", tipo: "golpe", impacto: "Ahí. Sabía dónde desde antes de que entraras.", daño: 22 },
     ],
   },
   prof_quimica: {
@@ -235,7 +235,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     profesor: true,
     patron: [
       { tell: "Mide algo sin mirar.", tipo: "espera" },
-      { tell: "Lo vuelca.", tipo: "golpe", daño: 19 },
+      { tell: "Lo vuelca.", tipo: "golpe", impacto: "Lo vuelca sin apuro y se queda mirando cómo te toca.", daño: 19 },
       { tell: "El aire se pone denso.", tipo: "efecto", efecto: "torpeza" },
     ],
   },
@@ -246,8 +246,8 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     profesor: true,
     patron: [
       { tell: "Se acuerda de vos.", tipo: "efecto", efecto: "miedo" },
-      { tell: "Cuenta cómo termina.", tipo: "golpe", daño: 17 },
-      { tell: "Lo cuenta otra vez.", tipo: "golpe", daño: 17 },
+      { tell: "Cuenta cómo termina.", tipo: "golpe", impacto: "Te cuenta cómo termina, y termina así.", daño: 17 },
+      { tell: "Lo cuenta otra vez.", tipo: "golpe", impacto: "Lo repite igual, palabra por palabra.", daño: 17 },
     ],
   },
   prof_literatura: {
@@ -257,9 +257,9 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     profesor: true,
     patron: [
       { tell: "Abre el cuaderno en tu página.", tipo: "espera" },
-      { tell: "Empieza a leer.", tipo: "golpe", daño: 15 },
+      { tell: "Empieza a leer.", tipo: "golpe", impacto: "Lee algo tuyo en voz alta.", daño: 15 },
       { tell: "Todos escuchan.", tipo: "efecto", efecto: "confusion" },
-      { tell: "Sigue leyendo.", tipo: "golpe", daño: 21 },
+      { tell: "Sigue leyendo.", tipo: "golpe", impacto: "Sigue leyendo. Nadie se ríe, que es peor.", daño: 21 },
     ],
   },
   prof_fisica: {
@@ -270,7 +270,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     patron: [
       { tell: "Ocho.", tipo: "espera" },
       { tell: "Nueve.", tipo: "efecto", efecto: "torpeza" },
-      { tell: "Diez.", tipo: "golpe", daño: 24 },
+      { tell: "Diez.", tipo: "golpe", impacto: "Diez. Se acabó el tiempo para todos.", daño: 24 },
     ],
   },
 };
