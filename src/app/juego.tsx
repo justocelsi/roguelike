@@ -32,13 +32,12 @@ import { DEFECTOS, PODERES } from "@/game/poderes";
 import { ICONOS, ICONOS_EFECTO, SPRITES } from "@/game/sprites";
 import type { Accion, Action, Entrada, State } from "@/game/types";
 
-/** Cuánto tarda en aparecer cada línea dentro de la acción de uno. */
-const RITMO = 650;
-/**
- * La pausa cuando el turno cambia de manos. Larga a propósito: es el momento
- * en que el enemigo se mueve y no querés poder adelantarte.
- */
-const RITMO_TURNO = 1500;
+/** Cuánto dura un evento común en pantalla. */
+const RITMO = 700;
+/** El último evento de una mano se queda más: es el turno cambiando de lado. */
+const RITMO_TURNO = 1100;
+/** El aviso del enemigo: es lo único que hay que leer para decidir. */
+const RITMO_AVISO = 1900;
 
 const SIN_LOG: Entrada[] = [];
 
@@ -69,7 +68,9 @@ export default function Juego() {
     pos.current = null;
   }
 
-  const evento = actual ? <Evento entrada={actual} k={restantes} /> : null;
+  // Sólo los estados frenan la pantalla entera; el resto va en línea.
+  const evento =
+    actual?.icono ? <EventoEfecto entrada={actual} k={restantes} /> : null;
 
   if (state.fase === "pasillo" && state.mundo) {
     return (
@@ -91,7 +92,13 @@ export default function Juego() {
       <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
         {state.fase !== "sueño" && <Cabecera state={state} />}
         {state.fase === "combate" && (
-          <Combate state={state} dispatch={dispatch} contando={contando} />
+          <Combate
+            state={state}
+            dispatch={dispatch}
+            contando={contando}
+            actual={actual}
+            restantes={restantes}
+          />
         )}
         {state.fase === "recompensa" && (
           <Recompensa state={state} dispatch={dispatch} contando={contando} />
@@ -568,6 +575,8 @@ function useSecuencia(log: Entrada[]) {
     const cronologico = log.slice(0, nuevas).reverse();
     setCola(
       cronologico.map((entrada, k) => {
+        // El aviso manda: es lo que el jugador tiene que leer para decidir.
+        if (entrada.aviso) return { entrada, dura: RITMO_AVISO };
         // El último evento de una mano se queda más tiempo: ese silencio es
         // el turno pasando de un lado al otro.
         const siguiente = cronologico[k + 1];
@@ -592,27 +601,45 @@ function useSecuencia(log: Entrada[]) {
   return { actual, contando: cola.length > 0, restantes: cola.length };
 }
 
-/** Un evento ocupando la pantalla. Nunca hay dos a la vez. */
-function Evento({ entrada, k }: { entrada: Entrada; k: number }) {
+/**
+ * El oscurecido de toda la pantalla queda reservado para cuando te agarra un
+ * estado: es lo bastante grave como para frenar todo. El resto de los eventos
+ * se muestran en línea, sin tapar el combate.
+ */
+function EventoEfecto({ entrada, k }: { entrada: Entrada; k: number }) {
+  if (!entrada.icono) return null;
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/80 px-8">
       <div
         key={`${k}-${entrada.texto}`}
         className="aparece flex max-w-sm flex-col items-center gap-4 text-center"
       >
-        <span className="text-[10px] tracking-[0.4em] text-dim">
-          {(entrada.actor ?? "vos") === "vos" ? "VOS" : "ESO"}
-        </span>
-        {entrada.icono && (
-          <Pixeles
-            data={ICONOS_EFECTO[entrada.icono]}
-            clase={`w-16 ${COLOR[entrada.tipo]}`}
-          />
-        )}
-        <p className={`text-lg leading-snug ${COLOR_FUERTE[entrada.tipo]}`}>
-          {entrada.texto}
-        </p>
+        <Pixeles data={ICONOS_EFECTO[entrada.icono]} clase="w-16 text-malo" />
+        <p className="text-lg leading-snug text-malo">{entrada.texto}</p>
       </div>
+    </div>
+  );
+}
+
+/** Un evento por vez, en el lugar donde vive el combate. */
+function EventoEnLinea({ entrada, k }: { entrada: Entrada; k: number }) {
+  return (
+    <div
+      key={`${k}-${entrada.texto}`}
+      className={`aparece flex min-h-20 flex-col justify-center gap-1.5 border-l-2 px-4 py-3 ${
+        entrada.aviso ? "border-agua bg-agua/5" : "border-agua-hondo"
+      }`}
+    >
+      <span className="text-[10px] tracking-[0.4em] text-dim">
+        {entrada.aviso
+          ? "SE DECIDE"
+          : (entrada.actor ?? "vos") === "vos"
+            ? "VOS"
+            : "ESO"}
+      </span>
+      <p className={`text-base leading-snug ${COLOR_FUERTE[entrada.tipo]}`}>
+        {entrada.texto}
+      </p>
     </div>
   );
 }
@@ -623,10 +650,14 @@ function Combate({
   state,
   dispatch,
   contando,
+  actual,
+  restantes,
 }: {
   state: State;
   dispatch: (a: Action) => void;
   contando: boolean;
+  actual: Entrada | null;
+  restantes: number;
 }) {
   const [menu, setMenu] = useState(false);
   const [golpe, setGolpe] = useState(0);
@@ -689,8 +720,6 @@ function Combate({
       })),
   ];
 
-  const visibles = state.log.slice(0, 3);
-
   return (
     <section className="space-y-4">
       {/* Destello en toda la pantalla: te entró. */}
@@ -717,11 +746,9 @@ function Combate({
             {num(c.vida, conf)}/{num(c.vidaMax, conf)}
           </div>
         </div>
-        <p className="w-full border-t border-dimmer pt-3 text-center text-sm text-agua">
-          {intencion.tell}
-        </p>
-        {/* Lo que viene, en números: sin información escondida no hay decisión. */}
-        <div className="flex gap-3 text-xs text-dim">
+        {/* Lo que viene, en números: sin información escondida no hay decisión.
+            El aviso en palabras vive abajo, donde se lee la secuencia. */}
+        <div className="flex w-full justify-center gap-3 border-t border-dimmer pt-3 text-xs text-dim">
           <span>
             {intencion.tipo === "golpe"
               ? `golpe ~${Math.round((intencion.daño ?? 0) * 1.15)}`
@@ -737,18 +764,16 @@ function Combate({
         </div>
       </div>
 
-      {/* El turno, línea por línea, pegado arriba de los botones. */}
-      <div className="min-h-16 space-y-1 border-l-2 border-agua-hondo pl-3">
-        {visibles.map((e, i) => (
-          <p
-            key={`${i}-${e.texto}`}
-            className={`text-xs leading-snug ${COLOR[e.tipo]}`}
-            style={{ opacity: i === 0 ? 1 : 0.4 - i * 0.1 }}
-          >
-            {e.texto}
-          </p>
-        ))}
-      </div>
+      {/* Un evento por vez, arriba de los botones. Cuando no pasa nada, el
+          aviso vigente queda a la vista para poder decidir. */}
+      {actual && !actual.icono ? (
+        <EventoEnLinea entrada={actual} k={restantes} />
+      ) : (
+        <div className="flex min-h-20 flex-col justify-center gap-1.5 border-l-2 border-agua px-4 py-3">
+          <span className="text-[10px] tracking-[0.4em] text-dim">VA A HACER</span>
+          <p className="text-base leading-snug text-agua">{intencion.tell}</p>
+        </div>
+      )}
 
       <div className={`grid grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
         <Boton

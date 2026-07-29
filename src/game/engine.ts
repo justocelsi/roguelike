@@ -115,9 +115,9 @@ function log(
   texto: string,
   tipo: Entrada["tipo"] = "neutral",
   actor?: Entrada["actor"],
-  icono?: Efecto,
+  extra?: { icono?: Efecto; aviso?: boolean },
 ): Entrada[] {
-  return [{ texto, tipo, actor, icono }, ...entradas].slice(0, 30);
+  return [{ texto, tipo, actor, ...extra }, ...entradas].slice(0, 30);
 }
 
 function aplicarDaño(state: State, base: number): number {
@@ -263,9 +263,13 @@ function turnoEnemigo(state: State, rng: Rng): State {
         efectos: ya
           ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
           : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
-        log: log(s.log, TEXTO_EFECTO[ef], "enemigo", undefined, ef),
+        log: log(s.log, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef }),
       };
     }
+  } else {
+    // Un turno de espera igual es un turno: si no se muestra, el jugador ve
+    // su acción y después el aviso, y parece que el enemigo se la saltó.
+    s = { ...s, log: log(s.log, "No hace nada. Todavía.", "neutral") };
   }
 
   // Todo lo agregado en este turno lleva la firma del enemigo.
@@ -314,6 +318,15 @@ function cerrarTurno(state: State, rng: Rng): State {
   }
   // El contraataque puede haber sido el golpe final.
   if (s.combate && s.combate.vida <= 0) return ganarCombate(s, rng);
+
+  // Recién ahora el enemigo decide lo próximo, y lo muestra. Este beat es lo
+  // único que el jugador necesita para elegir su turno, así que tiene que
+  // existir como evento y no cambiar en silencio arriba de la pantalla.
+  if (s.combate) {
+    const e = ENEMIGOS[s.combate.enemigoId];
+    const proxima = e.patron[s.combate.paso % e.patron.length];
+    s = { ...s, log: log(s.log, proxima.tell, "enemigo", "eso", { aviso: true }) };
+  }
   return s;
 }
 
@@ -427,12 +440,19 @@ function apply(state: State, action: Action, rng: Rng): State {
           paso: 0,
           esperando: false,
         },
+        // Entrás, y lo primero que pasa es que ves qué va a hacer.
         log: log(
-          state.log,
-          enemigo.profesor
-            ? `Adentro está ${enemigo.nombre}. La puerta no abre para atrás.`
-            : `${nombreDe(state, puerta.materiaId)}. Hay ${enemigo.nombre}.`,
-          enemigo.profesor ? "malo" : "neutral",
+          log(
+            state.log,
+            enemigo.profesor
+              ? `Adentro está ${enemigo.nombre}. La puerta no abre para atrás.`
+              : `${nombreDe(state, puerta.materiaId)}. Hay ${enemigo.nombre}.`,
+            enemigo.profesor ? "malo" : "neutral",
+          ),
+          enemigo.patron[0].tell,
+          "enemigo",
+          "eso",
+          { aviso: true },
         ),
       };
     }

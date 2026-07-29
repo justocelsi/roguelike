@@ -123,6 +123,12 @@ export type Entrada = {
   actor?: "vos" | "eso";
   /** Si el evento tiene un símbolo propio, cuál. */
   icono?: Efecto;
+  /**
+   * Es el enemigo mostrando qué va a hacer el turno que viene. Se queda más
+   * tiempo en pantalla que el resto: es lo único que el jugador necesita leer
+   * para decidir.
+   */
+  aviso?: boolean;
 };
 
 export type State = {
