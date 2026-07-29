@@ -99,13 +99,22 @@ más" sino "qué corresponde ahora".
 | Acción | Qué hace |
 |---|---|
 | **ATACAR** | 6 de daño. A mano limpia no le hacés gran cosa a esto |
-| **BLOQUEAR** | 85% de parar el golpe. Si sale, lo reducís al 20% **y le devolvés 23** |
+| **BLOQUEAR** | 90% de que salga. Si sale, sólo entra el 40% del golpe **y le devolvés 3** |
 | **ARMA** | Daño alto y usos contados **por pelea**. Es lo que hacés en los turnos en que no te cubrís |
 | **USAR** | Item, sombra o poder |
 | **HUIR** | Salís al pasillo. Contra un profesor la puerta no abre |
 
 El puño es débil a propósito, y esa es la pieza que sostiene el pasillo: sin
-arma, los turnos en que no te cubrís no valen nada. Ver el balance abajo.
+arma, los turnos en que no te cubrís no valen nada.
+
+**Bloquear nunca devuelve más que un ataque**, y deja pasar el 40% del golpe.
+Si devolviera más, no habría razón para atacar cuando ves venir un golpe; si
+anulara todo, no existiría la opción de correr a matarlo antes. Esas dos reglas
+son lo que hace que el turno sea una decisión y no un reflejo.
+
+**Cada profesor vencido suma +40% de daño a todo lo que hacés.** Sin eso los
+enemigos escalan por ciclo y tus números se quedan atrás: sin progresión, todos
+los estilos mueren el 85-91% de las veces.
 
 **El enemigo siempre telegrafía lo que va a hacer el turno siguiente.** Todo el
 combate es leer ese aviso y decidir si pegás o te cubrís. Cubrirte en el momento

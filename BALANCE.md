@@ -15,8 +15,10 @@ están versionados; se reconstruyen desde las descripciones de acá.
 | Perilla | Valor | Dónde | Qué toca |
 |---|---|---|---|
 | `DAÑO_ATAQUE` | **6** | `engine.ts` | Golpe a mano limpia |
-| `DAÑO_CONTRA` | **23** | `engine.ts` | Lo que devuelve un bloqueo que salió |
-| `EFECTIVIDAD_BLOQUEO` | **0.85** | `engine.ts` | Chance de que el bloqueo funcione |
+| `DAÑO_CONTRA` | **3** | `engine.ts` | Lo que devuelve un bloqueo que salió |
+| `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
+| `PASA_BLOQUEANDO` | **0.40** | `engine.ts` | Del golpe que igual entra bloqueando |
+| `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.92** | `engine.ts` | Puntería del golpe a mano limpia |
 | `FALLA_POR_MIEDO` | **0.30** | `engine.ts` | Chance de que una acción no salga con miedo |
 | `EV` (escala de vida) | **0.10** | `engine.ts` | Vida enemiga por ciclo |
@@ -42,21 +44,51 @@ distintas de jugar caigan en una banda parecida**, y que las degeneradas
 
 ### Medición actual
 
-| Estilo | Muertes | Ciclo alcanzado |
-|---|---|---|
-| Limpia todo, guarda los items para el profesor | 54,5% | 4,1 |
-| Limpia todo, cura apenas baja la vida | 55,7% | 4,1 |
-| Limpia la mitad del pasillo | 56,2% | 4,0 |
-| Limpia todo a lo bruto | 56,2% | 4,1 |
-| **Va derecho al profesor** | **76,4%** | 3,3 |
-| **Sólo bloquear, siempre** | **99,6%** | 1,6 |
-| **Sólo atacar, siempre** | **100,0%** | 1,0 |
+**Estilos de combate** — cómo decidís turno a turno:
 
-Cuatro estilos con criterio en 2 puntos de banda; las tres degeneradas, afuera.
+| Estilo | Muertes |
+|---|---|
+| Calculador: bloquea, salvo que pueda matarlo antes del golpe | 51,1% |
+| Luchador: corre a terminar la pelea, nunca bloquea | 52,5% |
+| Pasivo: bloquea siempre que ve venir un golpe | 57,7% |
+
+**Estilos de pasillo** — cuánto explorás y cuándo gastás:
+
+| Estilo | Muertes |
+|---|---|
+| Limpia todo a lo bruto | 55,2% |
+| Limpia todo, cura apenas baja la vida | 55,4% |
+| Limpia todo, guarda los items para el profesor | 57,2% |
+| Limpia la mitad del pasillo | 60,8% |
+| **Va derecho al profesor** | **91,9%** |
+
+**Degeneradas:** repetir una sola acción muere el 100%.
+
+Los dos ejes se cruzan: un luchador que limpia todo juega distinto de un
+pasivo que va a media pasada, y los dos son viables.
 
 ---
 
 ## Historia
+
+### Bloqueo: el error de hacerlo mejor que atacar
+
+**El error.** Se llegó a `DAÑO_CONTRA = 23` con `DAÑO_ATAQUE = 6`. Bloquear
+devolvía casi cuatro veces lo que un golpe, así que **no había ninguna razón
+para atacar cuando veías venir un golpe**. La decisión se había vaciado: la
+respuesta correcta era siempre la misma.
+
+**La regla que quedó.** *Bloquear no puede devolver más que un ataque normal.*
+Ahora devuelve **3**, la mitad del puño.
+
+**Y bloquear ya no anula.** Pasa el **40%** del golpe igual, así que a veces
+conviene comerse el impacto y correr a matarlo antes. Sin eso, bloquear era
+gratis y volvía a no haber decisión.
+
+**Medición del arreglo:** con contra 23, el pasivo ganaba por lejos. Ahora los
+tres estilos de combate caen en 51-58% y el que decide turno a turno gana por
+apenas 1 a 6 puntos — suficiente para premiar pensar, no tanto como para que
+los otros no se puedan jugar.
 
 ### Bloqueo: de una tirada segura a una que puede fallar
 
@@ -72,13 +104,12 @@ en que el enemigo no ataca, bloquear no hace nada y nunca lo matás. La
 preocupación no se sostenía, pero el bloqueo garantizado igual era poco
 interesante.
 
-**Ahora.** Una sola tirada al **85%** decide todo. Si sale, reduce el golpe al
-20% **y** devuelve. Si no sale, entra de lleno y no devolvés nada.
+**Ahora.** Una sola tirada al **90%** decide todo. Si sale, deja pasar el 40%
+del golpe **y** devuelve 3. Si no sale, entra de lleno y no devolvés nada.
 
-**Costo medido.** Pasar de garantizado a 85% llevó las muertes de ~53% a ~64%.
-Se compensó subiendo la devolución de **15 a 23**, que devolvió la banda a
-54-56%. Si alguna vez se vuelve al bloqueo garantizado, la devolución tiene que
-bajar a 15 otra vez.
+*Espejo*, el pasivo del sueño, cambia ese trato: sube la devolución a **20** y
+baja el bloqueo a **80%**. Es la única forma de que devolver valga la pena, y
+cuesta puntería.
 
 ### El puño débil, que es lo que sostiene el pasillo
 
@@ -99,6 +130,24 @@ vuelta: 58,8% limpiando contra 71,2% corriendo al fondo.
 
 > **Este es el número más delicado del juego.** Si se toca `DAÑO_ATAQUE`, hay
 > que volver a medir limpiar-contra-correr antes de darlo por bueno.
+
+### Progresión de daño del jugador
+
+**Problema.** Los enemigos escalan por ciclo pero el jugador no: sus números se
+quedaban atrás y el ciclo 5 era imposible.
+
+**Medición sin progresión:** todos los estilos mueren 85-91%.
+
+**Ahora.** Cada profesor vencido suma **+40% de daño a todo** lo que hace el
+jugador —puño, armas, items, contraataque—. Multiplicar todo por igual mantiene
+las proporciones entre las opciones mientras la escala crece.
+
+| Por profesor | Muertes (calculador) |
+|---|---|
+| +0% | 85,4% |
+| +30% | 55,3% |
+| **+40%** | **51,1%** |
+| +50% | 46,7% |
 
 ### Escalado de los enemigos
 

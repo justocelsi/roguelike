@@ -67,11 +67,11 @@ PODERES.espejo = {
   id: "espejo",
   nombre: "Espejo",
   texto:
-    "Lo que bloqueás vuelve mucho más fuerte, pero bloquear se te hace más difícil. +14 al contraataque, −12% de bloquear bien.",
+    "Bloquear te sale un poco menos, pero lo que devolvés deja de ser un empujón. Devolvés 20 en vez de 3, y bloquear baja de 90% a 80%.",
   usos: 0,
   precision: 1,
   efecto: {},
-  pasivo: { contraDaño: 14, contraPrecision: -0.12 },
+  pasivo: { contraDaño: 17, contraPrecision: -0.1 },
 };
 
 export const DEFECTOS: Record<string, Defecto> = {

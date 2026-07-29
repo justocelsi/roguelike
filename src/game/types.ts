@@ -181,12 +181,21 @@ export type State = {
   deformacion: Record<string, number>;
   /** Se venció al profesor: al salir de la recompensa se duerme. */
   cicloTerminado: boolean;
+  /**
+   * Profesores vencidos. Cada uno te sube el daño de todo lo que hacés: sin
+   * eso, los enemigos escalan por ciclo y tus números se quedan atrás.
+   */
+  profesoresVencidos: number;
 
   oferta: { poderId: string; defectoId: string }[];
   /** Un arma encontrada con la mochila llena: hay que elegir qué dejar. */
   armaOfrecida: string | null;
   /** Lo que sacaste del aula, listado uno por uno con su cantidad. */
-  botin: { tipo: "item" | "arma" | "sombra" | "vida"; id: string; cantidad: number }[];
+  botin: {
+    tipo: "item" | "arma" | "sombra" | "vida" | "potencia";
+    id: string;
+    cantidad: number;
+  }[];
 
   log: Entrada[];
   final: string | null;

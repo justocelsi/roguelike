@@ -36,7 +36,17 @@ export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 6);
  * Sin esto, leer bien el aviso te costaba la mitad de tu daño y esperar era
  * siempre una pérdida.
  */
-export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 23);
+/**
+ * Lo que devuelve un bloqueo: la mitad de un golpe a mano limpia. Nunca puede
+ * superar a atacar, o no habría razón para atacar cuando ves venir un golpe.
+ */
+export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 3);
+/**
+ * Cuánto del golpe pasa igual cuando bloqueás bien. No es cero a propósito:
+ * si bloquear anulara todo, no existiría la opción de correr a matarlo antes
+ * de que llegue a pegarte.
+ */
+export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0.4);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -50,7 +60,7 @@ export const PRECISION_ATAQUE = 0.92;
  * Bloquear no siempre sale. Cuando sale, para el golpe **y** le devolvés:
  * es una sola tirada y un solo resultado, para que se entienda de una.
  */
-export const EFECTIVIDAD_BLOQUEO = 0.85;
+export const EFECTIVIDAD_BLOQUEO = Number(process.env.NEXT_PUBLIC_BLOQ ?? 0.9);
 /** Ningún arma baja de acá por más gastada que esté. */
 const PRECISION_MINIMA = 0.35;
 
@@ -195,8 +205,18 @@ function dañar(s: State, d: number): State {
   return { ...s, combate: { ...s.combate, vida: s.combate.vida - d } };
 }
 
+/**
+ * Cuánto pega el jugador comparado con el arranque. Sube con cada profesor
+ * vencido y multiplica TODO lo que hacés —puño, armas, items, contraataque—
+ * para que la proporción entre ellos no se mueva mientras la escala crece.
+ */
+export function potencia(state: State): number {
+  return 1 + state.profesoresVencidos * POR_PROFESOR;
+}
+const POR_PROFESOR = Number(process.env.NEXT_PUBLIC_POTENCIA ?? 0.4);
+
 function aplicarDaño(state: State, base: number): number {
-  let d = base;
+  let d = base * potencia(state);
   for (const def of defectosActivos(state)) if (def.daño) d = def.daño(d);
   return Math.max(1, Math.round(d));
 }
@@ -311,7 +331,7 @@ function turnoEnemigo(state: State, rng: Rng): State {
       // con él la barra, llegan en el evento siguiente.
       let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
       s = { ...s, log: logEstado(s, intencion.impacto ?? "Te alcanza.", "enemigo") };
-      if (bloqueaBien) daño = Math.max(1, Math.round(daño * 0.2));
+      if (bloqueaBien) daño = Math.max(1, Math.round(daño * PASA_BLOQUEANDO));
       s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
       if (bloqueaBien) {
         s = { ...s, log: logEstado(s, `Lo bloqueás. Sólo −${daño}.`, "bueno") };
@@ -415,7 +435,8 @@ function ganarCombate(state: State, rng: Rng): State {
     const nuevaMax = vidaMaxima(state, state.jugador.vidaMax + 6);
     jugador = { ...jugador, vidaMax: nuevaMax, vida: nuevaMax };
     botin.push({ tipo: "vida", id: "vidaMax", cantidad: 6 });
-    l = log(l, "Aguantás un poco más que antes. +6 de vida máxima.", "bueno");
+    botin.push({ tipo: "potencia", id: "potencia", cantidad: Math.round(POR_PROFESOR * 100) });
+    l = log(l, "Aguantás más y pegás más fuerte que antes.", "bueno");
   } else if (materia && random(rng) < 0.45) {
     const armaId = pick(rng, materia.armas);
     const arma = ARMAS[armaId];
@@ -449,6 +470,7 @@ function ganarCombate(state: State, rng: Rng): State {
     efectos: [],
     fase: "recompensa",
     cicloTerminado: !!enemigo.profesor,
+    profesoresVencidos: state.profesoresVencidos + (enemigo.profesor ? 1 : 0),
     armaOfrecida,
     botin,
     log: l,
@@ -478,6 +500,7 @@ export function initialState(seed: number = randomSeed()): State {
     efectos: [],
     deformacion: Object.fromEntries(MATERIA_IDS.map((m) => [m, 0])),
     cicloTerminado: false,
+    profesoresVencidos: 0,
     oferta: [],
     armaOfrecida: null,
     botin: [],

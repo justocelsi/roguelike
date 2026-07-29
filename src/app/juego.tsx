@@ -982,6 +982,12 @@ function describirBotin(b: State["botin"][number]): {
         que: "Aguantás más en cada pelea, para siempre.",
         como: "No hay que hacer nada: ya está aplicado.",
       };
+    case "potencia":
+      return {
+        nombre: `${b.cantidad}% más de daño`,
+        que: "Todo lo que hacés pega más fuerte: puño, armas, items, bloqueo.",
+        como: "Es permanente y se acumula con cada profesor que vencés.",
+      };
   }
 }
 
