@@ -25,8 +25,12 @@ import type {
 
 export const CICLOS = 5;
 export const VIDA_BASE = 45;
-/** Daño del ataque a mano limpia. Fijo: no hay stats que lo escalen. */
-export const DAÑO_ATAQUE = 12;
+/**
+ * Daño del ataque a mano limpia. Bajo a propósito: un pibe sin nada en la
+ * mano no le hace gran cosa a esto. El arma es lo que hacés en los turnos en
+ * que no te estás cubriendo, y por eso vale la pena entrar a las aulas.
+ */
+export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 6);
 /**
  * Cubrirte justo cuando venía el golpe no sólo lo amortigua: contraatacás.
  * Sin esto, leer bien el aviso te costaba la mitad de tu daño y esperar era
@@ -58,13 +62,47 @@ export function factorMiedo(state: State): number {
   return tieneEfecto(state, "miedo") ? 1 - FALLA_POR_MIEDO : 1;
 }
 
-/** Precisión actual del arma: el filo se pierde con el uso. */
+/** Sombras que podés gastar en este combate. Nunca más de una. */
+export const SOMBRAS_POR_COMBATE = 1;
+
+/** Usos que le quedan al arma en este combate. Se recuperan en el próximo. */
+export function usosArma(state: State): number {
+  const j = state.jugador;
+  if (!j.armaId) return 0;
+  return ARMAS[j.armaId].usos - (state.combate?.armaUsada ?? 0);
+}
+
+/**
+ * Precisión actual del arma: el filo se pierde dentro del combate y vuelve
+ * entero en el siguiente. Es un arco de una pelea, no de una run.
+ */
 export function precisionArma(state: State): number {
   const j = state.jugador;
   if (!j.armaId) return 0;
   const arma = ARMAS[j.armaId];
-  const usados = arma.usos - j.armaUsos;
+  const usados = state.combate?.armaUsada ?? 0;
   return Math.max(PRECISION_MINIMA, arma.precision - usados * arma.desgaste);
+}
+
+/** Ejemplares de cada item que todavía no gastaste en este combate. */
+export function itemsDisponibles(state: State): string[] {
+  const usados = [...(state.combate?.itemsUsados ?? [])];
+  const libres: string[] = [];
+  for (const id of state.jugador.items) {
+    const i = usados.indexOf(id);
+    if (i === -1) libres.push(id);
+    else usados.splice(i, 1);
+  }
+  return libres;
+}
+
+export function usosPoder(state: State, id: string): number {
+  return PODERES[id].usos - (state.combate?.poderesUsados[id] ?? 0);
+}
+
+export function sombrasLibres(state: State): number {
+  if (state.jugador.sombras.length === 0) return 0;
+  return SOMBRAS_POR_COMBATE - (state.combate?.sombrasUsadas ?? 0);
 }
 const DURACION_EFECTO = 2;
 
@@ -147,9 +185,7 @@ function nuevoPasillo(state: State, rng: Rng): Mundo {
 }
 
 function generarOferta(state: State, rng: Rng) {
-  const poderesLibres = PODER_IDS.filter(
-    (p) => !state.jugador.poderes.some((x) => x.id === p),
-  );
+  const poderesLibres = PODER_IDS.filter((p) => !state.jugador.poderes.includes(p));
   const defectosLibres = DEFECTO_IDS.filter(
     (d) => !state.jugador.defectos.includes(d),
   );
@@ -347,8 +383,12 @@ function ganarCombate(state: State, rng: Rng): State {
     l = log(l, "Aguantás un poco más que antes. +6 de vida máxima.", "bueno");
   } else if (materia && random(rng) < 0.45) {
     const armaId = pick(rng, materia.armas);
-    jugador = { ...jugador, armaId, armaUsos: ARMAS[armaId].usos };
-    l = log(l, `Agarrás ${ARMAS[armaId].nombre}. ${ARMAS[armaId].usos} usos.`, "bueno");
+    jugador = { ...jugador, armaId };
+    l = log(
+      l,
+      `Agarrás ${ARMAS[armaId].nombre}. ${ARMAS[armaId].usos} usos por pelea.`,
+      "bueno",
+    );
   } else if (jugador.items.length < 5) {
     const itemId = pick(rng, ITEM_IDS);
     jugador = { ...jugador, items: [...jugador.items, itemId] };
@@ -374,7 +414,6 @@ export function initialState(seed: number = randomSeed()): State {
     vida: VIDA_BASE,
     vidaMax: VIDA_BASE,
     armaId: null,
-    armaUsos: 0,
     items: ["agua"],
     sombras: [],
     poderes: [],
@@ -439,6 +478,11 @@ function apply(state: State, action: Action, rng: Rng): State {
           vidaMax: vidaEnemigo,
           paso: 0,
           esperando: false,
+          // Entrás con todo entero: el desgaste no cruza la puerta.
+          itemsUsados: [],
+          poderesUsados: {},
+          armaUsada: 0,
+          sombrasUsadas: 0,
         },
         // Entrás, y lo primero que pasa es que ves qué va a hacer.
         log: log(
@@ -474,7 +518,7 @@ function apply(state: State, action: Action, rng: Rng): State {
       const defecto = DEFECTOS[par.defectoId];
       const jugador: Jugador = {
         ...state.jugador,
-        poderes: [...state.jugador.poderes, { id: poder.id, usos: poder.usos }],
+        poderes: [...state.jugador.poderes, poder.id],
         defectos: [...state.jugador.defectos, defecto.id],
       };
       const aceptado: State = {
@@ -554,10 +598,9 @@ function turnoDeCombate(
       break;
     }
     case "arma": {
-      if (!s.jugador.armaId || s.jugador.armaUsos <= 0) return s;
+      if (!s.jugador.armaId || usosArma(s) <= 0) return s;
       const arma = ARMAS[s.jugador.armaId];
-      // El uso se gasta aciertes o no: lo que se rompe es el arma, no el golpe.
-      const usos = s.jugador.armaUsos - 1;
+      // El uso se gasta aciertes o no. Y se recupera al salir del aula.
       const acierta = random(rng) <= precisionArma(s);
       const critico = acierta && random(rng) <= arma.critico;
 
@@ -572,82 +615,84 @@ function turnoDeCombate(
         texto = critico ? `${arma.texto} Justo ahí. ${d}.` : `${arma.texto} ${d}.`;
         tono = "bueno";
       }
-      if (usos <= 0) texto += " Y se rompe.";
 
       s = {
         ...s,
-        jugador: {
-          ...s.jugador,
-          armaUsos: usos,
-          armaId: usos > 0 ? s.jugador.armaId : null,
-        },
-        log: log(s.log, texto, usos <= 0 ? "malo" : tono),
+        combate: { ...s.combate!, armaUsada: s.combate!.armaUsada + 1 },
+        log: log(s.log, texto, tono),
       };
       break;
     }
     case "usar": {
       if (!ref) return s;
+
       if (ref.startsWith("sombra:")) {
         const id = ref.slice(7);
-        const i = s.jugador.sombras.indexOf(id);
-        if (i === -1) return s;
+        if (!s.jugador.sombras.includes(id) || sombrasLibres(s) <= 0) return s;
         s = {
           ...s,
-          jugador: { ...s.jugador, sombras: s.jugador.sombras.filter((_, k) => k !== i) },
+          combate: { ...s.combate!, sombrasUsadas: s.combate!.sombrasUsadas + 1 },
           efectos: [],
           log: log(s.log, `La sombra de ${ENEMIGOS[id].nombre} se interpone.`, "bueno"),
         };
         break;
       }
+
       if (ref.startsWith("poder:")) {
         const id = ref.slice(6);
-        const tiene = s.jugador.poderes.find((p) => p.id === id);
-        if (!tiene || tiene.usos <= 0) return s;
+        if (!s.jugador.poderes.includes(id) || usosPoder(s, id) <= 0) return s;
         const poder = PODERES[id];
-        const j0 = {
-          ...s.jugador,
-          poderes: s.jugador.poderes.map((p) =>
-            p.id === id ? { ...p, usos: p.usos - 1 } : p,
-          ),
+        // El uso se gasta salga o no; vuelve entero en el próximo combate.
+        const gastado = {
+          ...s.combate!,
+          poderesUsados: {
+            ...s.combate!.poderesUsados,
+            [id]: (s.combate!.poderesUsados[id] ?? 0) + 1,
+          },
         };
         if (random(rng) > poder.precision) {
           s = {
             ...s,
-            jugador: j0,
+            combate: gastado,
             log: log(s.log, `${poder.nombre} no llega a agarrar.`, "malo"),
           };
           break;
         }
-        let j = j0;
+        let j = s.jugador;
         if (poder.efecto.daño) vidaEnemigo -= aplicarDaño(s, poder.efecto.daño);
         if (poder.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + poder.efecto.vida) };
         s = {
           ...s,
           jugador: j,
+          combate: gastado,
           efectos: poder.efecto.limpia ? [] : s.efectos,
           log: log(s.log, `${poder.nombre}.`, "sueño"),
         };
         break;
       }
-      const idx = s.jugador.items.indexOf(ref);
-      if (idx === -1) return s;
+
+      if (!itemsDisponibles(s).includes(ref)) return s;
       const item = ITEMS[ref];
-      // El item se gasta igual: temblar y que se te caiga también cuenta.
-      const j0 = { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) };
+      // Se gasta igual: temblar y que se te caiga también cuenta como usarlo.
+      const gastado = {
+        ...s.combate!,
+        itemsUsados: [...s.combate!.itemsUsados, ref],
+      };
       if (random(rng) > item.precision) {
         s = {
           ...s,
-          jugador: j0,
-          log: log(s.log, `${item.nombre} se te cae. Se pierde.`, "malo"),
+          combate: gastado,
+          log: log(s.log, `${item.nombre} se te escapa de la mano.`, "malo"),
         };
         break;
       }
-      let j = j0;
+      let j = s.jugador;
       if (item.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + item.efecto.vida) };
       if (item.efecto.daño) vidaEnemigo -= aplicarDaño(s, item.efecto.daño);
       s = {
         ...s,
         jugador: j,
+        combate: gastado,
         efectos: item.efecto.limpia ? [] : s.efectos,
         log: log(s.log, `Usás ${item.nombre}.`, "bueno"),
       };

@@ -9,11 +9,15 @@ import {
   DAÑO_CONTRA,
   factorMiedo,
   initialState,
+  itemsDisponibles,
   nombreDe,
   PRECISION_ATAQUE,
   precisionArma,
   puedeHuir,
   reduce,
+  sombrasLibres,
+  usosArma,
+  usosPoder,
 } from "@/game/engine";
 import {
   CUERPO,
@@ -519,7 +523,11 @@ function Cabecera({ state }: { state: State }) {
         <span className="text-agua">
           CICLO {state.ciclo}/{CICLOS}
         </span>
-        <span>{j.armaId ? `${ARMAS[j.armaId].nombre} ×${j.armaUsos}` : "sin arma"}</span>
+        <span>
+          {j.armaId
+            ? `${ARMAS[j.armaId].nombre} ×${state.combate ? usosArma(state) : ARMAS[j.armaId].usos}`
+            : "sin arma"}
+        </span>
       </div>
       <Barra valor={j.vida} max={j.vidaMax} />
       <div className="flex justify-between text-xs text-dim">
@@ -697,25 +705,28 @@ function Combate({
     dispatch({ type: "combate", accion, ref });
   };
 
+  // Todo lo que se puede usar en este combate. Los usos vuelven en el próximo.
   const guardado = [
-    ...j.items.map((id, i) => ({
+    ...itemsDisponibles(state).map((id, i) => ({
       ref: id,
       key: `i${i}`,
       texto: `${ITEMS[id].nombre} · ${pct(ITEMS[id].precision)}% — ${ITEMS[id].descripcion}`,
       clase: "text-dim",
     })),
-    ...j.sombras.map((id, i) => ({
-      ref: `sombra:${id}`,
-      key: `s${i}`,
-      texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`,
-      clase: "text-sueno",
-    })),
+    ...(sombrasLibres(state) > 0
+      ? j.sombras.map((id, i) => ({
+          ref: `sombra:${id}`,
+          key: `s${i}`,
+          texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los efectos`,
+          clase: "text-sueno",
+        }))
+      : []),
     ...j.poderes
-      .filter((p) => p.usos > 0)
-      .map((p) => ({
-        ref: `poder:${p.id}`,
-        key: p.id,
-        texto: `${PODERES[p.id].nombre} ×${p.usos} · ${pct(PODERES[p.id].precision)}% — ${PODERES[p.id].texto}`,
+      .filter((id) => usosPoder(state, id) > 0)
+      .map((id) => ({
+        ref: `poder:${id}`,
+        key: id,
+        texto: `${PODERES[id].nombre} ×${usosPoder(state, id)} · ${pct(PODERES[id].precision)}% — ${PODERES[id].texto}`,
         clase: "text-agua",
       })),
   ];
@@ -790,10 +801,10 @@ function Combate({
           label={j.armaId ? ARMAS[j.armaId].nombre.toUpperCase() : "SIN ARMA"}
           sub={
             j.armaId
-              ? `${ARMAS[j.armaId].daño} · ${pct(precisionArma(state))}% · ×${j.armaUsos}`
+              ? `${ARMAS[j.armaId].daño} · ${pct(precisionArma(state))}% · ×${usosArma(state)}`
               : "—"
           }
-          disabled={!j.armaId || j.armaUsos <= 0}
+          disabled={!j.armaId || usosArma(state) <= 0}
           onClick={() => act("arma")}
         />
         <Boton

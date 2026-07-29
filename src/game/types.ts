@@ -98,18 +98,33 @@ export type Combate = {
   vidaMax: number;
   paso: number;
   esperando: boolean;
+  /**
+   * Todo lo que gastaste vive acá adentro y muere con el combate. El
+   * inventario del jugador nunca se toca: lo que tenés es una capacidad, lo
+   * gastado es una condición, y las condiciones no cruzan la puerta.
+   */
+  itemsUsados: string[];
+  poderesUsados: Record<string, number>;
+  armaUsada: number;
+  /** Una sola por combate, por más cadáveres que lleves encima. */
+  sombrasUsadas: number;
 };
 
 export type Fase = "pasillo" | "combate" | "recompensa" | "sueño" | "muerto" | "fin";
 
+/**
+ * Sólo capacidades. Nada de acá se consume peleando: los usos se recuperan
+ * en cada combate. Lo único que cambia entre aulas es qué tenés, no cuánto
+ * te queda.
+ */
 export type Jugador = {
   vida: number;
   vidaMax: number;
   armaId: string | null;
-  armaUsos: number;
+  /** Uno por cada ejemplar. Repetidos = más usos por combate. */
   items: string[];
   sombras: string[];
-  poderes: { id: string; usos: number }[];
+  poderes: string[];
   defectos: string[];
 };
 

@@ -42,6 +42,30 @@ casi hermoso. Lo que da miedo no es dormirse: es despertarse.
 
 ---
 
+## El principio: capacidades persisten, condiciones se restauran
+
+Todo el modelo de recursos sale de una sola regla:
+
+> **Entre combates persiste lo que *tenés*. Se restaura lo que *gastaste*.**
+
+Lo que tenés —el arma, los items, los poderes, las sombras— es una
+**capacidad** y te acompaña toda la run. Lo gastado —vida, usos, filo del
+arma, efectos— es una **condición**, vive adentro del combate y muere con él.
+Nada de eso cruza la puerta del aula.
+
+Consecuencias, todas verificadas con invariantes automáticas:
+
+- Entrás a cada aula **entero y con todo cargado**.
+- Las armas **no se rompen**: tienen usos *por pelea*.
+- Los poderes son **habilidades por combate**, no un recurso de la run.
+- Los items no se consumen para siempre: repetidos = más usos por pelea.
+- Las sombras se cargan igual, pero **sólo se puede gastar una por combate**
+  (si no, con quince encima los efectos dejarían de existir).
+
+En este colegio nada de lo que llevás se termina. El único que se gasta sos
+vos, y eso se arregla cuando salís del aula. **El único costo de pelear es el
+riesgo de morir.**
+
 ## Combate
 
 Cinco acciones y **ninguna estadística detrás**. La decisión no es "cuál pega
@@ -49,11 +73,14 @@ más" sino "qué corresponde ahora".
 
 | Acción | Qué hace |
 |---|---|
-| **ATACAR** | 12 de daño, fijo |
+| **ATACAR** | 6 de daño. A mano limpia no le hacés gran cosa a esto |
 | **ESPERAR** | Te cubrís. Si el golpe llega, **contraatacás por 15** |
-| **ARMA** | Daño alto, usos limitados; cuando se acaban se rompe |
+| **ARMA** | Daño alto y usos contados **por pelea**. Es lo que hacés en los turnos en que no te cubrís |
 | **USAR** | Item, sombra o poder |
 | **HUIR** | Salís al pasillo. Contra un profesor la puerta no abre |
+
+El puño es débil a propósito, y esa es la pieza que sostiene el pasillo: sin
+arma, los turnos en que no te cubrís no valen nada. Ver el balance abajo.
 
 **El enemigo siempre telegrafía lo que va a hacer el turno siguiente.** Todo el
 combate es leer ese aviso y decidir si pegás o te cubrís. Cubrirte en el momento
@@ -71,7 +98,8 @@ No son números, son reglas que cambian mientras duran:
 
 Una sola barra. **Se regenera entera al entrar a cada aula**: cada combate es un
 desafío letal autocontenido, no una carrera de desgaste. La única progresión
-permanente de vida es vencer profesores (+6 máximo cada uno).
+permanente de vida es vencer profesores (+6 máximo cada uno), y es una
+capacidad, no una condición: nunca hay que administrarla.
 
 **Sin atributos, sin XP, sin niveles.** Todo lo que te hace más fuerte son
 armas, items y poderes.
@@ -131,15 +159,34 @@ El sueño invierte la paleta: fondo claro, todo ordenado, sin ruido.
 
 ## Balance
 
-Verificado con 2000 partidas simuladas por bot:
+Verificado con bots sobre miles de partidas:
 
 | Bot | Muertes | Muere en el ciclo |
 |---|---|---|
-| Al azar | 99,2% | 2,1 |
-| Leyendo los avisos | 50,0% | 4,0 |
+| Al azar | 99,7% | 1,6 |
+| Leyendo los avisos | 58,1% | 3,6 |
 
 Los enemigos escalan por ciclo (vida +10%, daño +4%) para que el ciclo 5 no sea
 más blando que el 1.
+
+### La decisión del pasillo, medida
+
+Con nada que se gaste entre aulas, el único costo de pelear es el riesgo de
+morir — así que hay que verificar que limpiar el pasillo siga valiendo la pena:
+
+| Estrategia | Muertes | Items | Con arma |
+|---|---|---|---|
+| Limpia el pasillo | 58,8% | 4,9 | 97% |
+| Va derecho al profesor | 71,2% | 1,0 | 0% |
+
+La primera vez que se midió esto el resultado estaba **invertido**: saltearse
+las aulas era más seguro, porque el botín no cambiaba nada. La causa no era que
+las aulas fueran peligrosas —18 peleas sumaban 2,5 puntos de muerte— sino que
+el ataque a mano limpia era demasiado bueno y el arma aportaba apenas el 15% del
+daño de una pelea. Bajar el puño de 12 a 6 es lo que hizo existir la decisión.
+
+Subir la vida de los profesores no servía: endurecía todo sin cambiar cuál
+estrategia convenía.
 
 ---
 
