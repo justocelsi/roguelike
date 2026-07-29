@@ -74,6 +74,43 @@ PODERES.espejo = {
   pasivo: { contraDaño: 17, contraPrecision: -0.1 },
 };
 
+/** Ver más lejos: el espejo exacto del defecto que te tapa el aviso. */
+PODERES.ojera = {
+  id: "ojera",
+  nombre: "Ojera",
+  texto:
+    "De tanto no dormir empezaste a ver un paso más adelante. Ves también lo que va a hacer después.",
+  usos: 0,
+  precision: 1,
+  efecto: {},
+  pasivo: { verDoble: true },
+};
+
+/**
+ * Pasivos que se disparan solos en un momento del combate, en vez de cuando
+ * apretás un botón. Le dan textura al pool sin agregar acciones.
+ */
+PODERES.primera_hora = {
+  id: "primera_hora",
+  nombre: "Primera hora",
+  texto: "Todavía te queda algo de la noche. Tu primer golpe de cada pelea pega el doble.",
+  usos: 0,
+  precision: 1,
+  efecto: {},
+  pasivo: { primerGolpeDoble: true },
+};
+
+PODERES.segundo_aire = {
+  id: "segundo_aire",
+  nombre: "Segundo aire",
+  texto:
+    "La primera vez que bajás de la mitad en una pelea, recuperás 14. Una sola vez por aula.",
+  usos: 0,
+  precision: 1,
+  efecto: {},
+  pasivo: { red: 14 },
+};
+
 export const DEFECTOS: Record<string, Defecto> = {
   manos_frias: {
     id: "manos_frias",

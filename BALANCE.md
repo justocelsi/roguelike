@@ -18,6 +18,7 @@ están versionados; se reconstruyen desde las descripciones de acá.
 | `DAÑO_CONTRA` | **3** | `engine.ts` | Lo que devuelve un bloqueo que salió |
 | `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
 | `PASA_BLOQUEANDO` | **0.40** | `engine.ts` | Del golpe que igual entra bloqueando |
+| `MULT_ENEMIGO` | **1.25** | `engine.ts` | Perilla global del daño enemigo |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.92** | `engine.ts` | Puntería del golpe a mano limpia |
 | `FALLA_POR_MIEDO` | **0.30** | `engine.ts` | Chance de que una acción no salga con miedo |
@@ -48,19 +49,19 @@ distintas de jugar caigan en una banda parecida**, y que las degeneradas
 
 | Estilo | Muertes |
 |---|---|
-| Calculador: bloquea, salvo que pueda matarlo antes del golpe | 51,1% |
-| Luchador: corre a terminar la pelea, nunca bloquea | 52,5% |
-| Pasivo: bloquea siempre que ve venir un golpe | 57,7% |
+| Luchador: corre a terminar la pelea, nunca bloquea | 52,3% |
+| Calculador: bloquea, salvo que pueda matarlo antes del golpe | 54,6% |
+| Pasivo: bloquea siempre que puede | 60,0% |
 
 **Estilos de pasillo** — cuánto explorás y cuándo gastás:
 
 | Estilo | Muertes |
 |---|---|
-| Limpia todo a lo bruto | 55,2% |
-| Limpia todo, cura apenas baja la vida | 55,4% |
-| Limpia todo, guarda los items para el profesor | 57,2% |
-| Limpia la mitad del pasillo | 60,8% |
-| **Va derecho al profesor** | **91,9%** |
+| Limpia todo, cura apenas baja la vida | 59,8% |
+| Limpia todo a lo bruto | 62,0% |
+| Limpia todo, guarda los items para el profesor | 62,5% |
+| Limpia la mitad del pasillo | 62,6% |
+| **Va derecho al profesor** | **95,6%** |
 
 **Degeneradas:** repetir una sola acción muere el 100%.
 
@@ -130,6 +131,41 @@ vuelta: 58,8% limpiando contra 71,2% corriendo al fondo.
 
 > **Este es el número más delicado del juego.** Si se toca `DAÑO_ATAQUE`, hay
 > que volver a medir limpiar-contra-correr antes de darlo por bueno.
+
+### El bug de la torpeza, y por qué movió todo el balance
+
+La torpeza le daba al enemigo un segundo turno **en el mismo turno en que te
+la aplicaba**. Ese segundo movimiento era la intención siguiente del patrón —
+una que nunca se había anunciado. Desde el lado del jugador: atacabas y
+aparecía un estado de la nada.
+
+Medido antes de tocar nada: **195 de 11.030 apariciones de estado (1,8%) no
+eran la intención anunciada.**
+
+El arreglo tiene dos partes:
+1. La torpeza se cobra **desde el turno siguiente**, no desde el que te agarra.
+2. Cuando tenés torpeza, la interfaz muestra **los dos avisos**, porque el
+   enemigo va a actuar dos veces y todo lo que te pasa tiene que estar avisado.
+
+Verificado: **0 estados sin anunciar** sobre 11.334 apariciones.
+
+**Costo de balance:** el arreglo le sacó al enemigo un turno gratis por cada
+aplicación de torpeza y las muertes cayeron de ~55% a ~30%. Sumado a tres
+pasivos nuevos en el pool, hizo falta subir el daño enemigo un 25% global
+(`MULT_ENEMIGO = 1.25`) para volver a la banda.
+
+### Golpes imparables
+
+Tomado de Darkest Dungeon, donde el daño por tiempo ignora la protección. Una
+bandera en la intención: el bloqueo no la reduce ni deja devolver. Cinco golpes
+la tienen, tres de ellos son el remate de un profesor.
+
+Enriquece la lectura sin agregar sistemas: ya no leés sólo *"¿viene un
+golpe?"* sino *"¿viene un golpe, y se puede bloquear?"*.
+
+**Nota para medir:** los bots bloqueaban también contra golpes imparables, cosa
+que un jugador no haría al leer "NO SE PUEDE BLOQUEAR" en pantalla. Con los
+bots corregidos el estilo pasivo pasó de 17 a 8 puntos por debajo del luchador.
 
 ### Sin aviso: el defecto que quita información en vez de restar
 

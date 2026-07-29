@@ -47,6 +47,8 @@ export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 3);
  * de que llegue a pegarte.
  */
 export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0.4);
+/** Perilla global del daño enemigo. Se afina midiendo, no a ojo. */
+const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.25);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -83,16 +85,47 @@ export const MAX_ARMAS = 3;
  * Cuánto devuelve y con qué probabilidad sale el bloqueo, ya con los pasivos
  * del sueño aplicados. La interfaz muestra estos números, no los de base.
  */
-export function bloqueoDe(state: State): { daño: number; precision: number } {
-  let daño = DAÑO_CONTRA;
-  let precision = EFECTIVIDAD_BLOQUEO;
+/** Junta los pasivos de todos los poderes que tengas. */
+export function pasivos(state: State) {
+  const suma = {
+    contraDaño: 0,
+    contraPrecision: 0,
+    verDoble: false,
+    primerGolpeDoble: false,
+    red: 0,
+  };
   for (const id of state.jugador.poderes) {
     const p = PODERES[id].pasivo;
     if (!p) continue;
-    daño += p.contraDaño ?? 0;
-    precision += p.contraPrecision ?? 0;
+    suma.contraDaño += p.contraDaño ?? 0;
+    suma.contraPrecision += p.contraPrecision ?? 0;
+    suma.verDoble ||= !!p.verDoble;
+    suma.primerGolpeDoble ||= !!p.primerGolpeDoble;
+    suma.red = Math.max(suma.red, p.red ?? 0);
   }
-  return { daño, precision: Math.max(0.35, Math.min(1, precision)) };
+  return suma;
+}
+
+/**
+ * Los avisos que el jugador tiene derecho a ver. Normalmente uno; con torpeza
+ * encima son dos, porque el enemigo va a actuar dos veces y todo lo que te
+ * pasa tiene que haber estado anunciado. El pasivo "verDoble" suma uno más.
+ */
+export function avisos(state: State) {
+  const c = state.combate;
+  if (!c || !veElAviso(state)) return [];
+  const patron = ENEMIGOS[c.enemigoId].patron;
+  let cuantos = tieneEfecto(state, "torpeza") ? 2 : 1;
+  if (pasivos(state).verDoble) cuantos += 1;
+  return Array.from({ length: cuantos }, (_, i) => patron[(c.paso + i) % patron.length]);
+}
+
+export function bloqueoDe(state: State): { daño: number; precision: number } {
+  const p = pasivos(state);
+  return {
+    daño: DAÑO_CONTRA + p.contraDaño,
+    precision: Math.max(0.35, Math.min(1, EFECTIVIDAD_BLOQUEO + p.contraPrecision)),
+  };
 }
 
 /** Usos que le quedan a un arma en este combate. Se recargan en el próximo. */
@@ -152,10 +185,18 @@ export function puedeHuir(state: State): boolean {
   return !defectosActivos(state).some((d) => d.sinHuida);
 }
 
+/**
+ * Contra un profesor los estados duran la mitad. Sus patrones son largos y
+ * dos de ellos aplican dos tipos distintos: sin esto, una pelea de jefe te
+ * deja con estados encima casi permanentemente y dejan de ser un momento
+ * para pasar a ser el clima.
+ */
 function duracionEfecto(state: State): number {
-  return (
-    DURACION_EFECTO + (defectosActivos(state).some((d) => d.efectosLargos) ? 1 : 0)
-  );
+  const base =
+    DURACION_EFECTO + (defectosActivos(state).some((d) => d.efectosLargos) ? 1 : 0);
+  const contraProfesor =
+    state.combate && ENEMIGOS[state.combate.enemigoId].profesor;
+  return contraProfesor ? Math.max(1, Math.round(base / 2)) : base;
 }
 
 export function tieneEfecto(state: State, e: Efecto): boolean {
@@ -324,7 +365,9 @@ function turnoEnemigo(state: State, rng: Rng): State {
   const acierta = random(rng) <= (intencion.precision ?? 0.85);
   /** Si te pusiste a bloquear, una sola tirada decide todo el resultado. */
   const bloqueo = bloqueoDe(s);
-  const bloqueaBien = c.bloqueando && random(rng) <= bloqueo.precision;
+  // Un golpe imparable atraviesa el bloqueo: cubrirse no sirve de nada.
+  const bloqueaBien =
+    c.bloqueando && !intencion.imparable && random(rng) <= bloqueo.precision;
 
   if (intencion.tipo === "golpe") {
     if (!acierta) {
@@ -337,7 +380,7 @@ function turnoEnemigo(state: State, rng: Rng): State {
     } else {
       // El impacto se cuenta primero y todavía no cuesta nada: el número, y
       // con él la barra, llegan en el evento siguiente.
-      let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
+      let daño = aplicarRecibido(s, (intencion.daño ?? 0) * MULT_ENEMIGO * escalaDaño(s));
       s = { ...s, log: logEstado(s, intencion.impacto ?? "Te alcanza.", "enemigo") };
       if (bloqueaBien) daño = Math.max(1, Math.round(daño * PASA_BLOQUEANDO));
       s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
@@ -347,7 +390,16 @@ function turnoEnemigo(state: State, rng: Rng): State {
         s = dañar(s, d);
         s = { ...s, log: logEstado(s, `Y le devolvés ${d}.`, "bueno") };
       } else if (c.bloqueando) {
-        s = { ...s, log: logEstado(s, `No llegás a bloquearlo. −${daño}.`, "malo") };
+        s = {
+          ...s,
+          log: logEstado(
+            s,
+            intencion.imparable
+              ? `Te cubrís y pasa igual. −${daño}.`
+              : `No llegás a bloquearlo. −${daño}.`,
+            "malo",
+          ),
+        };
       } else {
         s = { ...s, log: logEstado(s, `De lleno. −${daño}.`, "malo") };
       }
@@ -385,9 +437,37 @@ function turnoEnemigo(state: State, rng: Rng): State {
   };
 }
 
+/**
+ * El pasivo que te levanta la primera vez que bajás de la mitad. Se chequea
+ * después de resolver el turno, así el jugador ve primero el golpe que lo
+ * dejó ahí y recién después la red.
+ */
+function redDeSeguridad(s: State): State {
+  const red = pasivos(s).red;
+  if (!red || !s.combate || s.combate.redUsada) return s;
+  if (s.jugador.vida <= 0 || s.jugador.vida > s.jugador.vidaMax / 2) return s;
+  const vida = Math.min(s.jugador.vidaMax, s.jugador.vida + red);
+  const conRed: State = {
+    ...s,
+    jugador: { ...s.jugador, vida },
+    combate: { ...s.combate, redUsada: true },
+  };
+  return {
+    ...conRed,
+    log: logEstado(conRed, `Segundo aire. Recuperás ${red}.`, "bueno", "vos"),
+  };
+}
+
 function cerrarTurno(state: State, rng: Rng): State {
+  /**
+   * La torpeza se cobra desde el turno siguiente al que te agarra, no en el
+   * mismo. Si no, el enemigo te la aplica y acto seguido ejecuta la intención
+   * que venía después — una que nunca se anunció — y aparece un estado de la
+   * nada. Todo lo que te pasa tiene que haber estado avisado.
+   */
+  const yaTorpe = tieneEfecto(state, "torpeza");
   let s = turnoEnemigo(state, rng);
-  if (tieneEfecto(s, "torpeza") && s.jugador.vida > 0) {
+  if (yaTorpe && s.jugador.vida > 0) {
     // Sigue siendo el turno del enemigo: va firmado como suyo para que la
     // pausa larga caiga antes de esta línea y no en el medio.
     s = {
@@ -565,6 +645,8 @@ function apply(state: State, action: Action, rng: Rng): State {
           // Los usos de armas y poderes vuelven enteros en cada aula.
           armasUsadas: {},
           poderesUsados: {},
+          primerGolpeHecho: false,
+          redUsada: false,
         },
         // Entrás, y lo primero que pasa es que ves qué va a hacer.
         log: log(
@@ -697,9 +779,18 @@ function turnoDeCombate(
         s = { ...s, log: logEstado(s, "Tirás el brazo y no está donde creías.", "malo") };
         break;
       }
-      const d = aplicarDaño(s, DAÑO_ATAQUE);
+      const doble = pasivos(s).primerGolpeDoble && !s.combate!.primerGolpeHecho;
+      const d = aplicarDaño(s, doble ? DAÑO_ATAQUE * 2 : DAÑO_ATAQUE);
       s = dañar(s, d);
-      s = { ...s, log: logEstado(s, `Le pegás. ${d}.`, "neutral") };
+      s = { ...s, combate: { ...s.combate!, primerGolpeHecho: true } };
+      s = {
+        ...s,
+        log: logEstado(
+          s,
+          doble ? `El primero entra entero. ${d}.` : `Le pegás. ${d}.`,
+          doble ? "bueno" : "neutral",
+        ),
+      };
       break;
     }
     case "bloquear": {
@@ -716,10 +807,12 @@ function turnoDeCombate(
       const acierta = random(rng) <= precisionArma(s, armaId);
       const critico = acierta && random(rng) <= arma.critico;
 
+      const dobleArma = pasivos(s).primerGolpeDoble && !s.combate!.primerGolpeHecho;
       s = {
         ...s,
         combate: {
           ...s.combate!,
+          primerGolpeHecho: true,
           armasUsadas: {
             ...s.combate!.armasUsadas,
             [armaId]: (s.combate!.armasUsadas[armaId] ?? 0) + 1,
@@ -731,7 +824,8 @@ function turnoDeCombate(
         // Errar es errar: no se tira la pérdida porque no hubo golpe.
         s = { ...s, log: logEstado(s, `${arma.nombre} pasa al lado.`, "malo") };
       } else {
-        const d = aplicarDaño(s, critico ? arma.daño * 2 : arma.daño);
+        const mult = (critico ? 2 : 1) * (dobleArma ? 2 : 1);
+        const d = aplicarDaño(s, arma.daño * mult);
         s = dañar(s, d);
         s = {
           ...s,

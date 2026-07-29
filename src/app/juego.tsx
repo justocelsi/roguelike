@@ -9,6 +9,7 @@ import {
   bloqueoDe,
   armasUsables,
   factorMiedo,
+  avisos,
   veElAviso,
   initialState,
   MAX_ARMAS,
@@ -803,6 +804,7 @@ function EventoEfecto({ entrada, k }: { entrada: Entrada; k: number }) {
         key={`${k}-${entrada.texto}`}
         className="aparece flex max-w-sm flex-col items-center gap-4 text-center"
       >
+        <span className="text-xs tracking-[0.35em] text-malo">ESO TE HIZO ESTO</span>
         <Pixeles data={ICONOS_EFECTO[entrada.icono]} clase="w-16 text-malo" />
         <p className="text-lg leading-snug text-malo">{entrada.texto}</p>
       </div>
@@ -813,7 +815,10 @@ function EventoEfecto({ entrada, k }: { entrada: Entrada; k: number }) {
 /** El detalle numérico de lo que el enemigo va a intentar. */
 function numerosDe(i: Intencion): string {
   const prob = `${Math.round((i.precision ?? 0.85) * 100)}% de acertar`;
-  if (i.tipo === "golpe") return `golpe de ~${Math.round((i.daño ?? 0) * 1.15)} · ${prob}`;
+  if (i.tipo === "golpe") {
+    const base = `golpe de ~${Math.round((i.daño ?? 0) * 1.15)} · ${prob}`;
+    return i.imparable ? `${base} · NO SE PUEDE BLOQUEAR` : base;
+  }
   if (i.tipo === "efecto") {
     return `te deja ${(NOMBRE_EFECTO[i.efecto ?? ""] ?? "").toLowerCase()} · ${prob}`;
   }
@@ -833,19 +838,22 @@ function EventoEnLinea({
   /** Con el aviso tapado, la línea del enemigo decidiendo no dice qué eligió. */
   ciego?: boolean;
 }) {
+  const mio = (entrada.actor ?? "vos") === "vos" && !entrada.aviso;
   return (
     <div
       key={`${k}-${entrada.texto}`}
-      className={`aparece flex min-h-18 shrink-0 flex-col justify-center gap-1 border-l-2 px-4 py-2.5 ${
-        entrada.aviso ? "border-agua bg-agua/5" : "border-agua-hondo"
+      className={`flex min-h-18 shrink-0 flex-col justify-center gap-1 px-4 py-2.5 ${
+        entrada.aviso
+          ? "entra-derecha border-l-2 border-agua bg-agua/5"
+          : mio
+            ? "entra-izquierda border-l-2 border-agua-hondo bg-agua/5 text-left"
+            : "entra-derecha items-end border-r-2 border-malo bg-malo/8 text-right"
       }`}
     >
-      <span className="text-xs tracking-[0.35em] text-dim">
-        {entrada.aviso
-          ? "SE DECIDE"
-          : (entrada.actor ?? "vos") === "vos"
-            ? "VOS"
-            : "ESO"}
+      <span
+        className={`text-xs tracking-[0.35em] ${mio ? "text-agua-hondo" : "text-malo"}`}
+      >
+        {entrada.aviso ? "SE DECIDE" : mio ? "▸ VOS" : "ESO ◂"}
       </span>
       <p
         className={`text-base leading-snug ${
@@ -910,6 +918,7 @@ function Combate({
   const j = state.jugador;
   // Con miedo encima, lo que vale es el producto de las dos tiradas.
   const ciego = !veElAviso(state);
+  const losAvisos = avisos(state);
   const miedo = factorMiedo(state);
   const pct = (p: number) => Math.round(p * miedo * 100);
 
@@ -999,10 +1008,19 @@ function Combate({
               Se mueve y no llegás a entender qué está por hacer.
             </p>
           ) : (
-            <>
-              <p className="text-base leading-snug text-agua">{intencion.tell}</p>
-              <p className="text-sm text-dim">{numerosDe(intencion)}</p>
-            </>
+            losAvisos.map((av, i) => (
+              <div key={i} className={i > 0 ? "border-t border-borde-suave pt-1" : ""}>
+                <p
+                  className={`leading-snug ${
+                    i === 0 ? "text-base text-agua" : "text-sm text-agua-hondo"
+                  }`}
+                >
+                  {i > 0 && <span className="text-dim">y después: </span>}
+                  {av.tell}
+                </p>
+                <p className="text-sm text-dim">{numerosDe(av)}</p>
+              </div>
+            ))
           )}
         </div>
       )}

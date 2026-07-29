@@ -37,6 +37,11 @@ export type Intencion = {
   efecto?: Efecto;
   /** 0..1. Nada acierta siempre, tampoco de este lado. */
   precision?: number;
+  /**
+   * Atraviesa el bloqueo: cubrirte no lo reduce ni te deja devolver. Es lo
+   * que hace que bloquear no sea siempre la respuesta correcta.
+   */
+  imparable?: boolean;
 };
 
 export type Enemigo = {
@@ -89,7 +94,16 @@ export type Poder = {
    * Los pasivos no se usan: te cambian una regla mientras los tengas. No
    * aparecen en el menú de acciones, viven en la ficha de arriba.
    */
-  pasivo?: { contraDaño?: number; contraPrecision?: number };
+  pasivo?: {
+    contraDaño?: number;
+    contraPrecision?: number;
+    /** Ves un aviso más adelante del que ya ves. */
+    verDoble?: boolean;
+    /** Tu primer golpe de cada pelea pega el doble. */
+    primerGolpeDoble?: boolean;
+    /** La primera vez que bajás de la mitad en una pelea, recuperás esto. */
+    red?: number;
+  };
 };
 
 export type Defecto = {
@@ -128,6 +142,9 @@ export type Combate = {
    */
   armasUsadas: Record<string, number>;
   poderesUsados: Record<string, number>;
+  /** Pasivos que se disparan una vez por pelea: acá se anota que ya pasó. */
+  primerGolpeHecho: boolean;
+  redUsada: boolean;
 };
 
 export type Fase = "pasillo" | "combate" | "recompensa" | "sueño" | "muerto" | "fin";
