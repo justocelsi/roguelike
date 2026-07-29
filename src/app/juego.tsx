@@ -100,7 +100,7 @@ export default function Juego() {
       */}
       <main
         className={`grano mx-auto flex w-full max-w-xl flex-col px-5 ${
-          state.fase === "combate"
+          state.fase === "combate" || state.fase === "recompensa"
             ? "h-dvh gap-3 overflow-hidden py-4"
             : "flex-1 gap-5 py-8"
         }`}
@@ -645,7 +645,7 @@ function Etiqueta({
   explicacion: string;
 }) {
   return (
-    <span className="group relative inline-block">
+    <span className="group inline-block">
       <span
         tabIndex={0}
         title={explicacion}
@@ -653,9 +653,15 @@ function Etiqueta({
       >
         {children}
       </span>
+      {/*
+        La explicación va fija abajo de todo y no colgada de la etiqueta: en la
+        pantalla de combate, que no scrollea, un tooltip absoluto quedaba
+        recortado por el borde. Además siempre aparece en el mismo lugar, que
+        es más fácil de leer que perseguirlo por la pantalla.
+      */}
       <span
         role="tooltip"
-        className="pointer-events-none absolute left-0 top-full z-30 mt-1 hidden w-64 border border-agua bg-background p-3 text-sm leading-snug text-foreground shadow-lg group-hover:block group-focus-within:block"
+        className="pointer-events-none fixed inset-x-0 bottom-0 z-[70] hidden border-t border-agua bg-background/97 p-4 text-center text-base leading-snug text-foreground group-focus-within:block group-hover:block"
       >
         {explicacion}
       </span>
@@ -1119,9 +1125,9 @@ function Recompensa({
 }) {
   const nueva = state.armaOfrecida;
   return (
-    <section className="space-y-4 border border-agua-hondo p-5">
+    <section className="flex min-h-0 flex-1 flex-col gap-3 border border-agua-hondo p-4">
       {state.caido && (
-        <div className="flex flex-col items-center gap-3 border-b border-borde-suave pb-5">
+        <div className="flex shrink-0 flex-col items-center gap-2 border-b border-borde-suave pb-3">
           <EnPie materiaId={state.caido.materiaId} muriendo />
           <p className="text-sm text-dim line-through decoration-malo">
             {ENEMIGOS[state.caido.enemigoId].nombre}
@@ -1135,24 +1141,22 @@ function Recompensa({
 
       {/* Lo que sacaste, uno por uno, con qué hace y cómo se usa. */}
       {state.botin.length > 0 && (
-        <div className="space-y-3 border-y border-borde-suave py-5">
+        <div className="flex min-h-0 flex-1 flex-col gap-2">
           <p className="text-sm tracking-widest text-dim">TE LLEVÁS</p>
-          <ul className="space-y-3">
+          <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {state.botin.map((b, i) => {
               const d = describirBotin(b);
               return (
-                <li key={i} className="border border-borde p-4">
+                <li key={i} className="border border-borde px-3 py-2">
                   <div className="flex items-baseline gap-2">
                     <span className="text-agua">+</span>
-                    <span className="text-lg text-foreground">{d.nombre}</span>
+                    <span className="text-base text-foreground">{d.nombre}</span>
                     {b.cantidad > 1 && (
-                      <span className="text-lg tabular-nums text-agua">
-                        ×{b.cantidad}
-                      </span>
+                      <span className="tabular-nums text-agua">×{b.cantidad}</span>
                     )}
                   </div>
-                  <p className="mt-2 text-base leading-snug text-foreground">{d.que}</p>
-                  <p className="mt-1 text-sm leading-snug text-dim">{d.como}</p>
+                  <p className="text-sm leading-snug text-foreground">{d.que}</p>
+                  <p className="text-sm leading-snug text-dim">{d.como}</p>
                 </li>
               );
             })}
@@ -1191,7 +1195,7 @@ function Recompensa({
         <button
           onClick={() => dispatch({ type: "seguir" })}
           disabled={contando}
-          className="w-full bg-agua p-3 text-sm font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
+          className="w-full shrink-0 bg-agua p-3 text-sm font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
         >
           {state.cicloTerminado ? "DORMIR" : "VOLVER AL PASILLO"}
         </button>
