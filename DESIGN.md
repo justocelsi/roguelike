@@ -165,6 +165,11 @@ Un escalón por ciclo, sobre dos materias al azar:
 
 ## Poder y Defecto
 
+Hay poderes **activos** —se usan en combate, con usos que se recargan cada
+pelea— y **pasivos**, que no se usan: cambian una regla mientras los tengas.
+*Espejo* es pasivo: suma 14 al contraataque pero te baja 12 puntos la chance de
+bloquear bien. Elegirlo es apostar a leer los avisos.
+
 Sorteados por separado: 6 × 6 = 36 ofertas con la mitad del contenido escrito.
 **Los defectos se acumulan y son permanentes.** Se implementan como
 interceptores sobre el motor — agregar uno es agregar un objeto a un catálogo.
@@ -233,6 +238,12 @@ convenía.
 - ¿Se puede morir dentro del sueño?
 - ¿Los enemigos se ven en el pasillo antes de entrar?
 - ¿El colegio es siempre el mismo edificio o se genera cada ciclo?
+
+## Balance
+
+Las perillas, sus valores y la historia de cada cambio están en
+[BALANCE.md](BALANCE.md), con las mediciones de antes y después de cada uno
+para poder volver atrás.
 
 ## Stack
 

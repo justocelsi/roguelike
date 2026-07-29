@@ -6,8 +6,7 @@ import {
   CICLOS,
   confundido,
   DAÑO_ATAQUE,
-  DAÑO_CONTRA,
-  EFECTIVIDAD_BLOQUEO,
+  bloqueoDe,
   armasUsables,
   factorMiedo,
   initialState,
@@ -592,6 +591,17 @@ function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number
               <span className="tabular-nums opacity-70">{e.turnos}</span>
             </Etiqueta>
           ))}
+          {j.poderes
+            .filter((id) => PODERES[id].pasivo)
+            .map((id) => (
+              <Etiqueta
+                key={id}
+                clase="border border-agua text-agua"
+                explicacion={PODERES[id].texto}
+              >
+                {PODERES[id].nombre}
+              </Etiqueta>
+            ))}
           {j.defectos.map((d) => (
             <Etiqueta
               key={d}
@@ -795,7 +805,7 @@ function Combate({
       clase: "text-sueno",
     })),
     ...j.poderes
-      .filter((id) => usosPoder(state, id) > 0)
+      .filter((id) => !PODERES[id].pasivo && usosPoder(state, id) > 0)
       .map((id) => ({
         ref: `poder:${id}`,
         key: id,
@@ -854,7 +864,7 @@ function Combate({
         />
         <Boton
           label="BLOQUEAR"
-          sub={`para el golpe y devolvés ${DAÑO_CONTRA} · ${Math.round(EFECTIVIDAD_BLOQUEO * 100)}%`}
+          sub={`para el golpe y devolvés ${bloqueoDe(state).daño} · ${Math.round(bloqueoDe(state).precision * 100)}%`}
           onClick={() => act("bloquear")}
         />
         <Boton
@@ -935,17 +945,43 @@ function Boton({
   );
 }
 
-/** Cómo se llama cada cosa que sacaste del aula. */
-function nombreBotin(b: State["botin"][number]): string {
+/** Cómo se llama cada cosa que sacaste del aula, y qué hace. */
+function describirBotin(b: State["botin"][number]): {
+  nombre: string;
+  que: string;
+  como: string;
+} {
   switch (b.tipo) {
-    case "item":
-      return ITEMS[b.id].nombre;
-    case "arma":
-      return ARMAS[b.id].nombre;
+    case "item": {
+      const it = ITEMS[b.id];
+      return {
+        nombre: it.nombre,
+        que: it.descripcion,
+        como: `Se usa desde USAR durante un combate. Se gasta para siempre: acierta ${Math.round(it.precision * 100)} de cada 100 veces.`,
+      };
+    }
+    case "arma": {
+      const a = ARMAS[b.id];
+      return {
+        nombre: a.nombre,
+        que: `${a.daño} de daño, acierta ${Math.round(a.precision * 100)} de cada 100.`,
+        como: a.infinita
+          ? `No se gasta nunca.${a.perdida ? ` Aunque cada golpe que entra tiene ${Math.round(a.perdida * 100)}% de que la pierdas.` : ""}`
+          : `${a.usos} usos por pelea, y se recargan en la siguiente. Pierde puntería con cada golpe.`,
+      };
+    }
     case "sombra":
-      return `la sombra de ${ENEMIGOS[b.id].nombre}`;
+      return {
+        nombre: `la sombra de ${ENEMIGOS[b.id].nombre}`,
+        que: "Te saca de encima todos los estados.",
+        como: "Se usa desde USAR. Es de un solo uso y no vuelve.",
+      };
     case "vida":
-      return `${b.cantidad} de vida máxima`;
+      return {
+        nombre: `${b.cantidad} de vida máxima`,
+        que: "Aguantás más en cada pelea, para siempre.",
+        como: "No hay que hacer nada: ya está aplicado.",
+      };
   }
 }
 
@@ -965,19 +1001,31 @@ function Recompensa({
         {state.cicloTerminado ? "SE TERMINÓ EL DÍA" : "EL AULA QUEDA VACÍA"}
       </p>
 
-      {/* Lo que sacaste, uno por uno y con cantidad. */}
+      {/* Lo que sacaste, uno por uno, con qué hace y cómo se usa. */}
       {state.botin.length > 0 && (
-        <ul className="space-y-1.5 border-y border-borde-suave py-3">
-          {state.botin.map((b, i) => (
-            <li key={i} className="flex items-baseline gap-2 text-sm">
-              <span className="text-agua">+</span>
-              <span className="text-foreground">{nombreBotin(b)}</span>
-              {b.cantidad > 1 && (
-                <span className="tabular-nums text-dim">×{b.cantidad}</span>
-              )}
-            </li>
-          ))}
-        </ul>
+        <div className="space-y-3 border-y border-borde-suave py-5">
+          <p className="text-sm tracking-widest text-dim">TE LLEVÁS</p>
+          <ul className="space-y-3">
+            {state.botin.map((b, i) => {
+              const d = describirBotin(b);
+              return (
+                <li key={i} className="border border-borde p-4">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-agua">+</span>
+                    <span className="text-lg text-foreground">{d.nombre}</span>
+                    {b.cantidad > 1 && (
+                      <span className="text-lg tabular-nums text-agua">
+                        ×{b.cantidad}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-2 text-base leading-snug text-foreground">{d.que}</p>
+                  <p className="mt-1 text-sm leading-snug text-dim">{d.como}</p>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
       )}
 
       {/* Mochila llena: no se sale del aula sin decidir qué se deja. */}

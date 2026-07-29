@@ -85,6 +85,11 @@ export type Poder = {
   usos: number;
   precision: number;
   efecto: { daño?: number; vida?: number; limpia?: boolean };
+  /**
+   * Los pasivos no se usan: te cambian una regla mientras los tengas. No
+   * aparecen en el menú de acciones, viven en la ficha de arriba.
+   */
+  pasivo?: { contraDaño?: number; contraPrecision?: number };
 };
 
 export type Defecto = {

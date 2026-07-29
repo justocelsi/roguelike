@@ -69,6 +69,22 @@ export function factorMiedo(state: State): number {
 /** Cuántas armas entran en la mochila. Llenarla obliga a elegir. */
 export const MAX_ARMAS = 3;
 
+/**
+ * Cuánto devuelve y con qué probabilidad sale el bloqueo, ya con los pasivos
+ * del sueño aplicados. La interfaz muestra estos números, no los de base.
+ */
+export function bloqueoDe(state: State): { daño: number; precision: number } {
+  let daño = DAÑO_CONTRA;
+  let precision = EFECTIVIDAD_BLOQUEO;
+  for (const id of state.jugador.poderes) {
+    const p = PODERES[id].pasivo;
+    if (!p) continue;
+    daño += p.contraDaño ?? 0;
+    precision += p.contraPrecision ?? 0;
+  }
+  return { daño, precision: Math.max(0.35, Math.min(1, precision)) };
+}
+
 /** Usos que le quedan a un arma en este combate. Se recargan en el próximo. */
 export function usosArma(state: State, armaId: string): number {
   const arma = ARMAS[armaId];
@@ -279,13 +295,14 @@ function turnoEnemigo(state: State, rng: Rng): State {
 
   const acierta = random(rng) <= (intencion.precision ?? 0.85);
   /** Si te pusiste a bloquear, una sola tirada decide todo el resultado. */
-  const bloqueaBien = c.bloqueando && random(rng) <= EFECTIVIDAD_BLOQUEO;
+  const bloqueo = bloqueoDe(s);
+  const bloqueaBien = c.bloqueando && random(rng) <= bloqueo.precision;
 
   if (intencion.tipo === "golpe") {
     if (!acierta) {
       s = { ...s, log: logEstado(s, "Va hacia vos y pasa de largo.", "neutral") };
       if (bloqueaBien) {
-        const d = aplicarDaño(s, DAÑO_CONTRA);
+        const d = aplicarDaño(s, bloqueo.daño);
         s = dañar(s, d);
         s = { ...s, log: logEstado(s, `Igual estabas firme. Le devolvés ${d}.`, "bueno") };
       }
@@ -298,7 +315,7 @@ function turnoEnemigo(state: State, rng: Rng): State {
       s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
       if (bloqueaBien) {
         s = { ...s, log: logEstado(s, `Lo bloqueás. Sólo −${daño}.`, "bueno") };
-        const d = aplicarDaño(s, DAÑO_CONTRA);
+        const d = aplicarDaño(s, bloqueo.daño);
         s = dañar(s, d);
         s = { ...s, log: logEstado(s, `Y le devolvés ${d}.`, "bueno") };
       } else if (c.bloqueando) {
@@ -734,6 +751,7 @@ function turnoDeCombate(
         const id = ref.slice(6);
         if (!s.jugador.poderes.includes(id) || usosPoder(s, id) <= 0) return s;
         const poder = PODERES[id];
+        if (poder.pasivo) return s;
         // El uso se gasta salga o no; vuelve entero en el próximo combate.
         s = {
           ...s,

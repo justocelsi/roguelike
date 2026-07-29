@@ -66,10 +66,12 @@ export const PODERES: Record<string, Poder> = {
 PODERES.espejo = {
   id: "espejo",
   nombre: "Espejo",
-  texto: "Le devolvés algo que no llegó a pegarte. 30 de daño.",
-  usos: 1,
-  precision: 0.9,
-  efecto: { daño: 30 },
+  texto:
+    "Lo que bloqueás vuelve mucho más fuerte, pero bloquear se te hace más difícil. +14 al contraataque, −12% de bloquear bien.",
+  usos: 0,
+  precision: 1,
+  efecto: {},
+  pasivo: { contraDaño: 14, contraPrecision: -0.12 },
 };
 
 export const DEFECTOS: Record<string, Defecto> = {
