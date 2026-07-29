@@ -121,6 +121,8 @@ export type Entrada = {
    * manos, para que se lea como una secuencia y no como un bloque.
    */
   actor?: "vos" | "eso";
+  /** Si el evento tiene un símbolo propio, cuál. */
+  icono?: Efecto;
 };
 
 export type State = {

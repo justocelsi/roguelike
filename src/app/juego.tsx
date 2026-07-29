@@ -7,6 +7,7 @@ import {
   confundido,
   DAÑO_ATAQUE,
   DAÑO_CONTRA,
+  factorMiedo,
   initialState,
   nombreDe,
   PRECISION_ATAQUE,
@@ -39,6 +40,8 @@ const RITMO = 650;
  */
 const RITMO_TURNO = 1500;
 
+const SIN_LOG: Entrada[] = [];
+
 export default function Juego() {
   const [state, setState] = useState<State | null>(null);
   const dispatch = (a: Action) => setState((s) => (s ? reduce(s, a) : s));
@@ -46,6 +49,9 @@ export default function Juego() {
   // teletransporte al principio del pasillo.
   const pos = useRef<{ x: number; y: number } | null>(null);
   const cicloAnterior = useRef(1);
+  // La secuencia también vive acá: el golpe que mata cambia de pantalla, y
+  // esas líneas tienen que terminar de verse igual.
+  const { actual, contando, restantes } = useSecuencia(state?.log ?? SIN_LOG);
 
   if (!state) {
     return (
@@ -63,33 +69,45 @@ export default function Juego() {
     pos.current = null;
   }
 
+  const evento = actual ? <Evento entrada={actual} k={restantes} /> : null;
+
   if (state.fase === "pasillo" && state.mundo) {
     return (
-      <Pasillo
-        state={state}
-        mundo={state.mundo}
-        pos={pos}
-        onEntrar={(p) => dispatch({ type: "entrar-aula", puertaX: p.x, puertaY: p.y })}
-      />
+      <>
+        {evento}
+        <Pasillo
+          state={state}
+          mundo={state.mundo}
+          pos={pos}
+          onEntrar={(p) => dispatch({ type: "entrar-aula", puertaX: p.x, puertaY: p.y })}
+        />
+      </>
     );
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
-      {state.fase !== "sueño" && <Cabecera state={state} />}
-      {state.fase === "combate" && <Combate state={state} dispatch={dispatch} />}
-      {state.fase === "recompensa" && <Recompensa state={state} dispatch={dispatch} />}
-      {state.fase === "sueño" && <Sueño state={state} dispatch={dispatch} />}
-      {(state.fase === "muerto" || state.fase === "fin") && (
-        <Final
-          state={state}
-          onRestart={() => {
-            pos.current = null;
-            setState(initialState());
-          }}
-        />
-      )}
-    </main>
+    <>
+      {evento}
+      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
+        {state.fase !== "sueño" && <Cabecera state={state} />}
+        {state.fase === "combate" && (
+          <Combate state={state} dispatch={dispatch} contando={contando} />
+        )}
+        {state.fase === "recompensa" && (
+          <Recompensa state={state} dispatch={dispatch} contando={contando} />
+        )}
+        {state.fase === "sueño" && <Sueño state={state} dispatch={dispatch} />}
+        {(state.fase === "muerto" || state.fase === "fin") && (
+          <Final
+            state={state}
+            onRestart={() => {
+              pos.current = null;
+              setState(initialState());
+            }}
+          />
+        )}
+      </main>
+    </>
   );
 }
 
@@ -525,26 +543,19 @@ function Cabecera({ state }: { state: State }) {
   );
 }
 
-// --- combate --------------------------------------------------------------
+// --- la secuencia del turno ----------------------------------------------
 
-function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => void }) {
-  const [menu, setMenu] = useState(false);
-  /** Cuántas de las líneas más nuevas todavía no se mostraron. */
-  const [ocultas, setOcultas] = useState(0);
+/**
+ * Reproduce los eventos nuevos del log de a uno. Vive en un hook porque el
+ * remate que mata al enemigo cambia de fase, y esas líneas también tienen que
+ * verse: si no, el mejor momento del combate se lo come el cambio de pantalla.
+ */
+function useSecuencia(log: Entrada[]) {
+  const [cola, setCola] = useState<{ entrada: Entrada; dura: number }[]>([]);
+  const [actual, setActual] = useState<Entrada | null>(null);
   const cabeza = useRef<Entrada | null | undefined>(undefined);
-  const [golpe, setGolpe] = useState(0);
-  const vidaEnemigoPrev = useRef<number | null>(null);
-  const vidaPrev = useRef(state.jugador.vida);
-  const [herido, setHerido] = useState(0);
-  const [avisoEfecto, setAvisoEfecto] = useState<string | null>(null);
-  const efectosPrev = useRef<string[]>([]);
 
-  const c = state.combate;
-  const vidaEnemigo = c?.vida ?? null;
-
-  // El turno se cuenta solo: cada línea nueva aparece después de la anterior.
   useEffect(() => {
-    const log = state.log;
     if (cabeza.current === undefined) {
       cabeza.current = log[0] ?? null;
       return;
@@ -552,22 +563,79 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
     const i = cabeza.current ? log.indexOf(cabeza.current) : log.length;
     const nuevas = i === -1 ? log.length : i;
     cabeza.current = log[0] ?? null;
-    setOcultas(Math.max(0, nuevas - 1));
-  }, [state.log]);
+    if (nuevas <= 0) return;
+
+    const cronologico = log.slice(0, nuevas).reverse();
+    setCola(
+      cronologico.map((entrada, k) => {
+        // El último evento de una mano se queda más tiempo: ese silencio es
+        // el turno pasando de un lado al otro.
+        const siguiente = cronologico[k + 1];
+        const cambiaDeManos =
+          !!siguiente && (siguiente.actor ?? "vos") !== (entrada.actor ?? "vos");
+        return { entrada, dura: cambiaDeManos ? RITMO_TURNO : RITMO };
+      }),
+    );
+  }, [log]);
 
   useEffect(() => {
-    if (ocultas <= 0) return;
-    // Si la línea que viene la hizo el otro, se espera más: ese silencio es
-    // el turno del enemigo, y durante todo ese rato no podés tocar nada.
-    const proxima = state.log[ocultas - 1];
-    const actual = state.log[ocultas];
-    const cambiaDeManos = (proxima?.actor ?? "vos") !== (actual?.actor ?? "vos");
-    const t = setTimeout(
-      () => setOcultas((o) => Math.max(0, o - 1)),
-      cambiaDeManos ? RITMO_TURNO : RITMO,
-    );
+    if (cola.length === 0) {
+      setActual(null);
+      return;
+    }
+    const [primero, ...resto] = cola;
+    setActual(primero.entrada);
+    const t = setTimeout(() => setCola(resto), primero.dura);
     return () => clearTimeout(t);
-  }, [ocultas, state.log]);
+  }, [cola]);
+
+  return { actual, contando: cola.length > 0, restantes: cola.length };
+}
+
+/** Un evento ocupando la pantalla. Nunca hay dos a la vez. */
+function Evento({ entrada, k }: { entrada: Entrada; k: number }) {
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/80 px-8">
+      <div
+        key={`${k}-${entrada.texto}`}
+        className="aparece flex max-w-sm flex-col items-center gap-4 text-center"
+      >
+        <span className="text-[10px] tracking-[0.4em] text-dim">
+          {(entrada.actor ?? "vos") === "vos" ? "VOS" : "ESO"}
+        </span>
+        {entrada.icono && (
+          <Pixeles
+            data={ICONOS_EFECTO[entrada.icono]}
+            clase={`w-16 ${COLOR[entrada.tipo]}`}
+          />
+        )}
+        <p className={`text-lg leading-snug ${COLOR_FUERTE[entrada.tipo]}`}>
+          {entrada.texto}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+// --- combate --------------------------------------------------------------
+
+function Combate({
+  state,
+  dispatch,
+  contando,
+}: {
+  state: State;
+  dispatch: (a: Action) => void;
+  contando: boolean;
+}) {
+  const [menu, setMenu] = useState(false);
+  const [golpe, setGolpe] = useState(0);
+  const vidaEnemigoPrev = useRef<number | null>(null);
+  const vidaPrev = useRef(state.jugador.vida);
+  const [herido, setHerido] = useState(0);
+
+  const c = state.combate;
+  const vidaEnemigo = c?.vida ?? null;
 
   // Sacudida del enemigo cuando le entra, y del borde cuando te entra a vos.
   useEffect(() => {
@@ -583,23 +651,14 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
     vidaPrev.current = state.jugador.vida;
   }, [state.jugador.vida]);
 
-  // Cuando te agarra un estado nuevo, se muestra grande un segundo.
-  useEffect(() => {
-    const actuales = state.efectos.map((e) => e.efecto);
-    const nuevo = actuales.find((e) => !efectosPrev.current.includes(e));
-    efectosPrev.current = actuales;
-    if (!nuevo) return;
-    setAvisoEfecto(nuevo);
-    const t = setTimeout(() => setAvisoEfecto(null), 1300);
-    return () => clearTimeout(t);
-  }, [state.efectos]);
-
   if (!c) return null;
   const enemigo = ENEMIGOS[c.enemigoId];
   const intencion = enemigo.patron[c.paso % enemigo.patron.length];
   const conf = confundido(state);
   const j = state.jugador;
-  const contando = ocultas > 0;
+  // Con miedo encima, lo que vale es el producto de las dos tiradas.
+  const miedo = factorMiedo(state);
+  const pct = (p: number) => Math.round(p * miedo * 100);
 
   const act = (accion: Accion, ref?: string) => {
     if (contando) return;
@@ -611,7 +670,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
     ...j.items.map((id, i) => ({
       ref: id,
       key: `i${i}`,
-      texto: `${ITEMS[id].nombre} · ${Math.round(ITEMS[id].precision * 100)}% — ${ITEMS[id].descripcion}`,
+      texto: `${ITEMS[id].nombre} · ${pct(ITEMS[id].precision)}% — ${ITEMS[id].descripcion}`,
       clase: "text-dim",
     })),
     ...j.sombras.map((id, i) => ({
@@ -625,12 +684,12 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
       .map((p) => ({
         ref: `poder:${p.id}`,
         key: p.id,
-        texto: `${PODERES[p.id].nombre} ×${p.usos} · ${Math.round(PODERES[p.id].precision * 100)}% — ${PODERES[p.id].texto}`,
+        texto: `${PODERES[p.id].nombre} ×${p.usos} · ${pct(PODERES[p.id].precision)}% — ${PODERES[p.id].texto}`,
         clase: "text-agua",
       })),
   ];
 
-  const visibles = state.log.slice(ocultas, ocultas + 3);
+  const visibles = state.log.slice(0, 3);
 
   return (
     <section className="space-y-4">
@@ -640,18 +699,6 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
           key={`destello-${herido}`}
           className="destello pointer-events-none fixed inset-0 z-50"
         />
-      )}
-
-      {/* Y el ícono de lo que te agarró, grande y un segundo. */}
-      {avisoEfecto && (
-        <div className="pointer-events-none fixed inset-0 z-50 flex items-center justify-center">
-          <div className="marca flex flex-col items-center gap-3 text-malo">
-            <Pixeles data={ICONOS_EFECTO[avisoEfecto]} clase="w-20" />
-            <span className="text-xs font-bold tracking-[0.3em]">
-              {NOMBRE_EFECTO[avisoEfecto]}
-            </span>
-          </div>
-        </div>
       )}
 
       <div
@@ -694,8 +741,8 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
       <div className="min-h-16 space-y-1 border-l-2 border-agua-hondo pl-3">
         {visibles.map((e, i) => (
           <p
-            key={`${ocultas}-${i}-${e.texto}`}
-            className={`text-xs leading-snug ${COLOR[e.tipo]} ${i === 0 ? "aparece" : ""}`}
+            key={`${i}-${e.texto}`}
+            className={`text-xs leading-snug ${COLOR[e.tipo]}`}
             style={{ opacity: i === 0 ? 1 : 0.4 - i * 0.1 }}
           >
             {e.texto}
@@ -706,7 +753,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
       <div className={`grid grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
         <Boton
           label="ATACAR"
-          sub={`${DAÑO_ATAQUE} · ${Math.round(PRECISION_ATAQUE * 100)}%`}
+          sub={`${DAÑO_ATAQUE} · ${pct(PRECISION_ATAQUE)}%`}
           onClick={() => act("atacar")}
         />
         <Boton
@@ -718,7 +765,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
           label={j.armaId ? ARMAS[j.armaId].nombre.toUpperCase() : "SIN ARMA"}
           sub={
             j.armaId
-              ? `${ARMAS[j.armaId].daño} · ${Math.round(precisionArma(state) * 100)}% · ×${j.armaUsos}`
+              ? `${ARMAS[j.armaId].daño} · ${pct(precisionArma(state))}% · ×${j.armaUsos}`
               : "—"
           }
           disabled={!j.armaId || j.armaUsos <= 0}
@@ -780,7 +827,15 @@ function Boton({
   );
 }
 
-function Recompensa({ state, dispatch }: { state: State; dispatch: (a: Action) => void }) {
+function Recompensa({
+  state,
+  dispatch,
+  contando,
+}: {
+  state: State;
+  dispatch: (a: Action) => void;
+  contando: boolean;
+}) {
   return (
     <section className="space-y-4 border border-agua-hondo p-5">
       <p className="text-xs tracking-widest text-agua">
@@ -793,7 +848,8 @@ function Recompensa({ state, dispatch }: { state: State; dispatch: (a: Action) =
       ))}
       <button
         onClick={() => dispatch({ type: "seguir" })}
-        className="w-full bg-agua p-3 text-xs font-bold tracking-widest text-background hover:opacity-80"
+        disabled={contando}
+        className="w-full bg-agua p-3 text-xs font-bold tracking-widest text-background hover:opacity-80 disabled:opacity-30"
       >
         {state.cicloTerminado ? "DORMIR" : "VOLVER AL PASILLO"}
       </button>
@@ -874,6 +930,15 @@ function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
 
 const COLOR = {
   neutral: "text-dim",
+  bueno: "text-agua",
+  malo: "text-malo",
+  sueño: "text-sueno",
+  enemigo: "text-foreground",
+} as const;
+
+/** Los mismos tonos, pero para el evento que ocupa la pantalla. */
+const COLOR_FUERTE = {
+  neutral: "text-foreground",
   bueno: "text-agua",
   malo: "text-malo",
   sueño: "text-sueno",

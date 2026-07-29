@@ -46,6 +46,18 @@ export const PRECISION_CONTRA = 0.9;
 /** Ningún arma baja de acá por más gastada que esté. */
 const PRECISION_MINIMA = 0.35;
 
+/** Con miedo encima, esta parte de las acciones no sale directamente. */
+export const FALLA_POR_MIEDO = 0.3;
+
+/**
+ * El miedo se multiplica con la precisión de lo que uses: primero tira si la
+ * acción sale, después si acierta. La interfaz muestra el producto, no los
+ * factores, porque es lo que al jugador le importa.
+ */
+export function factorMiedo(state: State): number {
+  return tieneEfecto(state, "miedo") ? 1 - FALLA_POR_MIEDO : 1;
+}
+
 /** Precisión actual del arma: el filo se pierde con el uso. */
 export function precisionArma(state: State): number {
   const j = state.jugador;
@@ -103,8 +115,9 @@ function log(
   texto: string,
   tipo: Entrada["tipo"] = "neutral",
   actor?: Entrada["actor"],
+  icono?: Efecto,
 ): Entrada[] {
-  return [{ texto, tipo, actor }, ...entradas].slice(0, 30);
+  return [{ texto, tipo, actor, icono }, ...entradas].slice(0, 30);
 }
 
 function aplicarDaño(state: State, base: number): number {
@@ -250,7 +263,7 @@ function turnoEnemigo(state: State, rng: Rng): State {
         efectos: ya
           ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
           : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
-        log: log(s.log, TEXTO_EFECTO[ef], "enemigo"),
+        log: log(s.log, TEXTO_EFECTO[ef], "enemigo", undefined, ef),
       };
     }
   }
@@ -496,7 +509,7 @@ function turnoDeCombate(
   }
 
   // El miedo puede hacer que la acción no salga.
-  if (tieneEfecto(s, "miedo") && random(rng) < 0.3) {
+  if (tieneEfecto(s, "miedo") && random(rng) < FALLA_POR_MIEDO) {
     s = { ...s, log: log(s.log, "No te sale. Te quedás duro.", "malo") };
     return cerrarTurno(s, rng);
   }
