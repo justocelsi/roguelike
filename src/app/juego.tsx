@@ -6,8 +6,11 @@ import {
   CICLOS,
   confundido,
   DAÑO_ATAQUE,
+  DAÑO_CONTRA,
   initialState,
   nombreDe,
+  PRECISION_ATAQUE,
+  precisionArma,
   puedeHuir,
   reduce,
 } from "@/game/engine";
@@ -142,6 +145,49 @@ function Pasillo({
   const entrarRef = useRef(onEntrar);
   entrarRef.current = onEntrar;
 
+  /**
+   * Joystick virtual estilo Soul Knight: tocás donde quieras y ese punto pasa
+   * a ser el centro. Nada de una cruceta fija en una esquina que obliga a
+   * mirarse el pulgar.
+   */
+  const joy = useRef({ dx: 0, dy: 0 });
+  const [joyVis, setJoyVis] = useState<{
+    ox: number;
+    oy: number;
+    kx: number;
+    ky: number;
+  } | null>(null);
+  const origen = useRef<{ x: number; y: number } | null>(null);
+  const RADIO = 46;
+
+  const tocar = (e: React.PointerEvent) => {
+    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    const caja = e.currentTarget.getBoundingClientRect();
+    origen.current = { x: e.clientX - caja.left, y: e.clientY - caja.top };
+    setJoyVis({ ox: origen.current.x, oy: origen.current.y, kx: 0, ky: 0 });
+  };
+
+  const arrastrar = (e: React.PointerEvent) => {
+    if (!origen.current) return;
+    const caja = e.currentTarget.getBoundingClientRect();
+    let dx = e.clientX - caja.left - origen.current.x;
+    let dy = e.clientY - caja.top - origen.current.y;
+    const largo = Math.hypot(dx, dy);
+    if (largo > RADIO) {
+      dx = (dx / largo) * RADIO;
+      dy = (dy / largo) * RADIO;
+    }
+    // Zona muerta chica, para que apoyar el dedo no te haga caminar.
+    joy.current = largo < 8 ? { dx: 0, dy: 0 } : { dx: dx / RADIO, dy: dy / RADIO };
+    setJoyVis((v) => (v ? { ...v, kx: dx, ky: dy } : v));
+  };
+
+  const soltar = () => {
+    origen.current = null;
+    joy.current = { dx: 0, dy: 0 };
+    setJoyVis(null);
+  };
+
   useEffect(() => {
     const canvas = canvasRef.current;
     const ctx = canvas?.getContext("2d");
@@ -179,9 +225,16 @@ function Pasillo({
       if (teclas.has("d") || teclas.has("arrowright")) dx += 1;
       if (teclas.has("w") || teclas.has("arrowup")) dy -= 1;
       if (teclas.has("s") || teclas.has("arrowdown")) dy += 1;
+      // El joystick manda si lo estás usando; el teclado si no.
+      if (joy.current.dx || joy.current.dy) {
+        dx = joy.current.dx;
+        dy = joy.current.dy;
+      }
       if (dx || dy) {
         const largo = Math.hypot(dx, dy);
-        const nueva = mover(mundo, p, (dx / largo) * VELOCIDAD * dt, (dy / largo) * VELOCIDAD * dt);
+        // Con joystick el largo también gradúa la velocidad.
+        const paso = VELOCIDAD * dt * Math.min(1, largo);
+        const nueva = mover(mundo, p, (dx / largo) * paso, (dy / largo) * paso);
         mirando = { x: Math.sign(dx), y: Math.sign(dy) };
         p.x = nueva.x;
         p.y = nueva.y;
@@ -274,7 +327,14 @@ function Pasillo({
     <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-5 py-8">
       <Cabecera state={state} />
 
-      <div className="relative border border-dimmer">
+      <div
+        className="relative touch-none border border-dimmer select-none"
+        onPointerDown={tocar}
+        onPointerMove={arrastrar}
+        onPointerUp={soltar}
+        onPointerCancel={soltar}
+        onPointerLeave={soltar}
+      >
         <canvas
           ref={canvasRef}
           width={720}
@@ -282,6 +342,43 @@ function Pasillo({
           className="w-full"
           style={{ imageRendering: "pixelated" }}
         />
+
+        {/* El joystick aparece donde apoyaste el dedo y desaparece al soltar. */}
+        {joyVis && (
+          <>
+            <div
+              className="pointer-events-none absolute rounded-full border-2 border-agua/30"
+              style={{
+                left: joyVis.ox - RADIO,
+                top: joyVis.oy - RADIO,
+                width: RADIO * 2,
+                height: RADIO * 2,
+              }}
+            />
+            <div
+              className="pointer-events-none absolute rounded-full bg-agua/70"
+              style={{
+                left: joyVis.ox + joyVis.kx - 16,
+                top: joyVis.oy + joyVis.ky - 16,
+                width: 32,
+                height: 32,
+              }}
+            />
+          </>
+        )}
+
+        {/* Botón de acción para mobile: aparece sólo si hay algo que abrir. */}
+        {cerca && !cerca.usada && (
+          <button
+            onPointerDown={(e) => {
+              e.stopPropagation();
+              entrarRef.current(cerca);
+            }}
+            className="absolute right-3 top-3 rounded-full bg-agua px-5 py-3 text-xs font-bold tracking-widest text-background md:hidden"
+          >
+            ENTRAR
+          </button>
+        )}
 
         {cerca && (
           <div className="absolute inset-x-0 bottom-0 border-t border-agua bg-background/95 p-3">
@@ -316,7 +413,8 @@ function Pasillo({
       </div>
 
       <p className="text-xs text-dim">
-        WASD o flechas · [E] para entrar · al fondo del pasillo está el profesor
+        WASD, flechas o arrastrá el dedo · [E] para entrar · al fondo del
+        pasillo está el profesor
       </p>
       <Bitacora state={state} />
     </main>
@@ -474,7 +572,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
     ...j.items.map((id, i) => ({
       ref: id,
       key: `i${i}`,
-      texto: `${ITEMS[id].nombre} — ${ITEMS[id].descripcion}`,
+      texto: `${ITEMS[id].nombre} · ${Math.round(ITEMS[id].precision * 100)}% — ${ITEMS[id].descripcion}`,
       clase: "text-dim",
     })),
     ...j.sombras.map((id, i) => ({
@@ -488,7 +586,7 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
       .map((p) => ({
         ref: `poder:${p.id}`,
         key: p.id,
-        texto: `${PODERES[p.id].nombre} ×${p.usos} — ${PODERES[p.id].texto}`,
+        texto: `${PODERES[p.id].nombre} ×${p.usos} · ${Math.round(PODERES[p.id].precision * 100)}% — ${PODERES[p.id].texto}`,
         clase: "text-agua",
       })),
   ];
@@ -516,6 +614,21 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
         <p className="w-full border-t border-dimmer pt-3 text-center text-sm text-agua">
           {intencion.tell}
         </p>
+        {/* Lo que viene, en números: sin información escondida no hay decisión. */}
+        <div className="flex gap-3 text-xs text-dim">
+          <span>
+            {intencion.tipo === "golpe"
+              ? `golpe ~${Math.round((intencion.daño ?? 0) * 1.15)}`
+              : intencion.tipo === "efecto"
+                ? `te agarra ${NOMBRE_EFECTO[intencion.efecto ?? ""] ?? ""}`
+                : "no hace nada"}
+          </span>
+          {intencion.tipo !== "espera" && (
+            <span className="tabular-nums">
+              {Math.round((intencion.precision ?? 0.85) * 100)}% de acertar
+            </span>
+          )}
+        </div>
       </div>
 
       {/* El turno, línea por línea, pegado arriba de los botones. */}
@@ -532,11 +645,23 @@ function Combate({ state, dispatch }: { state: State; dispatch: (a: Action) => v
       </div>
 
       <div className={`grid grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
-        <Boton label="ATACAR" sub={`${DAÑO_ATAQUE}`} onClick={() => act("atacar")} />
-        <Boton label="ESPERAR" sub="te cubrís · contraatacás" onClick={() => act("esperar")} />
+        <Boton
+          label="ATACAR"
+          sub={`${DAÑO_ATAQUE} · ${Math.round(PRECISION_ATAQUE * 100)}%`}
+          onClick={() => act("atacar")}
+        />
+        <Boton
+          label="ESPERAR"
+          sub={`cubrirte · devolver ${DAÑO_CONTRA}`}
+          onClick={() => act("esperar")}
+        />
         <Boton
           label={j.armaId ? ARMAS[j.armaId].nombre.toUpperCase() : "SIN ARMA"}
-          sub={j.armaId ? `${ARMAS[j.armaId].daño} · quedan ${j.armaUsos}` : "—"}
+          sub={
+            j.armaId
+              ? `${ARMAS[j.armaId].daño} · ${Math.round(precisionArma(state) * 100)}% · ×${j.armaUsos}`
+              : "—"
+          }
           disabled={!j.armaId || j.armaUsos <= 0}
           onClick={() => act("arma")}
         />

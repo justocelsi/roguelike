@@ -33,6 +33,27 @@ export const DAÑO_ATAQUE = 12;
  * siempre una pérdida.
  */
 export const DAÑO_CONTRA = 15;
+
+/**
+ * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
+ * que el número esté siempre a la vista: el azar escondido se siente tramposo,
+ * el azar declarado es una apuesta que tomó el jugador.
+ *
+ * Las dos acciones que premian leer bien el aviso son las que mejor apuntan.
+ */
+export const PRECISION_ATAQUE = 0.92;
+export const PRECISION_CONTRA = 0.9;
+/** Ningún arma baja de acá por más gastada que esté. */
+const PRECISION_MINIMA = 0.35;
+
+/** Precisión actual del arma: el filo se pierde con el uso. */
+export function precisionArma(state: State): number {
+  const j = state.jugador;
+  if (!j.armaId) return 0;
+  const arma = ARMAS[j.armaId];
+  const usados = arma.usos - j.armaUsos;
+  return Math.max(PRECISION_MINIMA, arma.precision - usados * arma.desgaste);
+}
 const DURACION_EFECTO = 2;
 
 /** El colegio empeora por ciclo. Sin esto, el ciclo 5 sería igual que el 1. */
@@ -184,39 +205,51 @@ function turnoEnemigo(state: State, rng: Rng): State {
   let s = state;
 
   let contra = 0;
+  const acierta = random(rng) <= (intencion.precision ?? 0.85);
+  /** Te cubriste: aunque no te toque, quedaste parado para devolver. */
+  const devolver = () => {
+    if (!c.esperando) return;
+    contra = aplicarDaño(s, DAÑO_CONTRA);
+    if (random(rng) > PRECISION_CONTRA) {
+      contra = 0;
+      s = { ...s, log: log(s.log, "Tirás a devolver y no llegás.", "neutral") };
+    } else {
+      s = { ...s, log: log(s.log, `Se abrió. Le devolvés ${contra}.`, "bueno") };
+    }
+  };
+
   if (intencion.tipo === "golpe") {
-    let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
-    // Primero qué hizo, después qué te costó: son dos eventos distintos y la
-    // interfaz los muestra uno después del otro.
-    s = {
-      ...s,
-      log: log(s.log, intencion.impacto ?? "Te alcanza.", "enemigo"),
-    };
-    if (c.esperando) {
-      daño = Math.max(1, Math.round(daño * 0.2));
-      contra = aplicarDaño(s, DAÑO_CONTRA);
+    if (!acierta) {
+      s = { ...s, log: log(s.log, "Va hacia vos y pasa de largo.", "neutral") };
+      devolver();
+    } else {
+      // Primero qué hizo, después qué te costó: son dos eventos distintos y la
+      // interfaz los muestra uno después del otro.
+      let daño = aplicarRecibido(s, (intencion.daño ?? 0) * escalaDaño(s));
+      s = { ...s, log: log(s.log, intencion.impacto ?? "Te alcanza.", "enemigo") };
+      if (c.esperando) {
+        daño = Math.max(1, Math.round(daño * 0.2));
+        s = { ...s, log: log(s.log, `Lo viste venir: sólo −${daño}.`, "bueno") };
+        devolver();
+      } else {
+        s = { ...s, log: log(s.log, `De lleno. −${daño}.`, "malo") };
+      }
+      s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
+    }
+  } else if (intencion.tipo === "efecto" && intencion.efecto) {
+    if (!acierta) {
+      s = { ...s, log: log(s.log, "Lo intenta y no te agarra.", "neutral") };
+    } else {
+      const ef = intencion.efecto;
+      const ya = s.efectos.some((x) => x.efecto === ef);
       s = {
         ...s,
-        log: log(
-          s.log,
-          `Lo viste venir: sólo −${daño}. Le devolvés ${contra}.`,
-          "bueno",
-        ),
+        efectos: ya
+          ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
+          : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
+        log: log(s.log, TEXTO_EFECTO[ef], "enemigo"),
       };
-    } else {
-      s = { ...s, log: log(s.log, `De lleno. −${daño}.`, "malo") };
     }
-    s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
-  } else if (intencion.tipo === "efecto" && intencion.efecto) {
-    const ef = intencion.efecto;
-    const ya = s.efectos.some((x) => x.efecto === ef);
-    s = {
-      ...s,
-      efectos: ya
-        ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
-        : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
-      log: log(s.log, TEXTO_EFECTO[ef], "enemigo"),
-    };
   }
 
   return {
@@ -458,6 +491,10 @@ function turnoDeCombate(
 
   switch (accion) {
     case "atacar": {
+      if (random(rng) > PRECISION_ATAQUE) {
+        s = { ...s, log: log(s.log, "Tirás el brazo y no está donde creías.", "malo") };
+        break;
+      }
       const d = aplicarDaño(s, DAÑO_ATAQUE);
       vidaEnemigo -= d;
       s = { ...s, log: log(s.log, `Le pegás. ${d}.`, "neutral") };
@@ -471,9 +508,24 @@ function turnoDeCombate(
     case "arma": {
       if (!s.jugador.armaId || s.jugador.armaUsos <= 0) return s;
       const arma = ARMAS[s.jugador.armaId];
-      const d = aplicarDaño(s, arma.daño);
-      vidaEnemigo -= d;
+      // El uso se gasta aciertes o no: lo que se rompe es el arma, no el golpe.
       const usos = s.jugador.armaUsos - 1;
+      const acierta = random(rng) <= precisionArma(s);
+      const critico = acierta && random(rng) <= arma.critico;
+
+      let texto: string;
+      let tono: Entrada["tipo"];
+      if (!acierta) {
+        texto = `${arma.nombre} pasa al lado.`;
+        tono = "malo";
+      } else {
+        const d = aplicarDaño(s, critico ? arma.daño * 2 : arma.daño);
+        vidaEnemigo -= d;
+        texto = critico ? `${arma.texto} Justo ahí. ${d}.` : `${arma.texto} ${d}.`;
+        tono = "bueno";
+      }
+      if (usos <= 0) texto += " Y se rompe.";
+
       s = {
         ...s,
         jugador: {
@@ -481,11 +533,7 @@ function turnoDeCombate(
           armaUsos: usos,
           armaId: usos > 0 ? s.jugador.armaId : null,
         },
-        log: log(
-          s.log,
-          usos > 0 ? `${arma.texto} ${d}.` : `${arma.texto} ${d}. Y se rompe.`,
-          usos > 0 ? "bueno" : "malo",
-        ),
+        log: log(s.log, texto, usos <= 0 ? "malo" : tono),
       };
       break;
     }
@@ -508,12 +556,21 @@ function turnoDeCombate(
         const tiene = s.jugador.poderes.find((p) => p.id === id);
         if (!tiene || tiene.usos <= 0) return s;
         const poder = PODERES[id];
-        let j = {
+        const j0 = {
           ...s.jugador,
           poderes: s.jugador.poderes.map((p) =>
             p.id === id ? { ...p, usos: p.usos - 1 } : p,
           ),
         };
+        if (random(rng) > poder.precision) {
+          s = {
+            ...s,
+            jugador: j0,
+            log: log(s.log, `${poder.nombre} no llega a agarrar.`, "malo"),
+          };
+          break;
+        }
+        let j = j0;
         if (poder.efecto.daño) vidaEnemigo -= aplicarDaño(s, poder.efecto.daño);
         if (poder.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + poder.efecto.vida) };
         s = {
@@ -527,14 +584,24 @@ function turnoDeCombate(
       const idx = s.jugador.items.indexOf(ref);
       if (idx === -1) return s;
       const item = ITEMS[ref];
-      let j = { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) };
+      // El item se gasta igual: temblar y que se te caiga también cuenta.
+      const j0 = { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) };
+      if (random(rng) > item.precision) {
+        s = {
+          ...s,
+          jugador: j0,
+          log: log(s.log, `${item.nombre} se te cae. Se pierde.`, "malo"),
+        };
+        break;
+      }
+      let j = j0;
       if (item.efecto.vida) j = { ...j, vida: Math.min(j.vidaMax, j.vida + item.efecto.vida) };
       if (item.efecto.daño) vidaEnemigo -= aplicarDaño(s, item.efecto.daño);
       s = {
         ...s,
         jugador: j,
         efectos: item.efecto.limpia ? [] : s.efectos,
-        log: log(s.log, `Usás ${item.nombre}.`, "neutral"),
+        log: log(s.log, `Usás ${item.nombre}.`, "bueno"),
       };
       break;
     }

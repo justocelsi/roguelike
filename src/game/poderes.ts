@@ -14,6 +14,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "Insomnio",
     texto: "Lo que no dormiste se te devuelve de golpe. 25 de daño.",
     usos: 2,
+    precision: 0.85,
     efecto: { daño: 25 },
   },
   repaso: {
@@ -21,6 +22,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "Repaso",
     texto: "Volver sobre lo que ya sabías. Recuperás 20.",
     usos: 3,
+    precision: 0.9,
     efecto: { vida: 20 },
   },
   lucidez: {
@@ -28,6 +30,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "Lucidez",
     texto: "Por un momento ves con claridad. Te saca todo lo que tengas encima.",
     usos: 3,
+    precision: 0.95,
     efecto: { limpia: true },
   },
   parpadeo: {
@@ -35,6 +38,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "Parpadeo",
     texto: "Cerrás los ojos un segundo largo. Recuperás 25.",
     usos: 2,
+    precision: 0.88,
     efecto: { vida: 25 },
   },
   memoria: {
@@ -42,6 +46,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "Memoria ajena",
     texto: "Alguien más se acuerda por vos. 15 de daño y recuperás 10.",
     usos: 2,
+    precision: 0.85,
     efecto: { daño: 15, vida: 10 },
   },
   campana: {
@@ -49,6 +54,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "El timbre",
     texto: "Suena antes de tiempo. 18 de daño y te saca los efectos.",
     usos: 2,
+    precision: 0.85,
     efecto: { daño: 18, limpia: true },
   },
 };

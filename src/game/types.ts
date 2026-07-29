@@ -29,6 +29,8 @@ export type Intencion = {
   impacto?: string;
   daño?: number;
   efecto?: Efecto;
+  /** 0..1. Nada acierta siempre, tampoco de este lado. */
+  precision?: number;
 };
 
 export type Enemigo = {
@@ -46,6 +48,12 @@ export type Arma = {
   daño: number;
   /** Se gasta. Es la razón por la que no la usás siempre. */
   usos: number;
+  /** 0..1 con el arma entera. Cuanto más pega, menos acierta. */
+  precision: number;
+  /** Cuánta precisión pierde por cada uso. El filo se va. */
+  desgaste: number;
+  /** Probabilidad de pegar el doble. */
+  critico: number;
   texto: string;
 };
 
@@ -53,6 +61,7 @@ export type Item = {
   id: string;
   nombre: string;
   descripcion: string;
+  precision: number;
   efecto: { vida?: number; limpia?: boolean; daño?: number };
 };
 
@@ -61,6 +70,7 @@ export type Poder = {
   nombre: string;
   texto: string;
   usos: number;
+  precision: number;
   efecto: { daño?: number; vida?: number; limpia?: boolean };
 };
 
