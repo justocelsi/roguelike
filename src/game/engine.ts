@@ -470,6 +470,7 @@ function ganarCombate(state: State, rng: Rng): State {
     efectos: [],
     fase: "recompensa",
     cicloTerminado: !!enemigo.profesor,
+    caido: { enemigoId: enemigo.id, materiaId: c.materiaId },
     profesoresVencidos: state.profesoresVencidos + (enemigo.profesor ? 1 : 0),
     armaOfrecida,
     botin,
@@ -500,6 +501,7 @@ export function initialState(seed: number = randomSeed()): State {
     efectos: [],
     deformacion: Object.fromEntries(MATERIA_IDS.map((m) => [m, 0])),
     cicloTerminado: false,
+    caido: null,
     profesoresVencidos: 0,
     oferta: [],
     armaOfrecida: null,
@@ -644,11 +646,12 @@ function volverAlPasillo(state: State, rng: Rng, forzarSueño: boolean): State {
       fase: "sueño",
       mundo: null,
       cicloTerminado: false,
+      caido: null,
       oferta: generarOferta(state, rng),
       log: log(state.log, "Te sentás en el pasillo y por fin te dormís.", "sueño"),
     };
   }
-  return { ...state, fase: "pasillo" };
+  return { ...state, fase: "pasillo", caido: null };
 }
 
 function turnoDeCombate(

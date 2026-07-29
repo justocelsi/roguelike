@@ -181,6 +181,8 @@ export type State = {
   deformacion: Record<string, number>;
   /** Se venció al profesor: al salir de la recompensa se duerme. */
   cicloTerminado: boolean;
+  /** El que acaba de caer. La recompensa lo muestra desarmándose. */
+  caido: { enemigoId: string; materiaId: string } | null;
   /**
    * Profesores vencidos. Cada uno te sube el daño de todo lo que hacés: sin
    * eso, los enemigos escalan por ciclo y tus números se quedan atrás.

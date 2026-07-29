@@ -93,7 +93,7 @@ export default function Juego() {
   return (
     <>
       {evento}
-      <main className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
+      <main className="grano mx-auto flex w-full max-w-xl flex-1 flex-col gap-5 px-5 py-8">
         {state.fase !== "sueño" && (
           <Cabecera state={state} vidaMostrada={actual?.vidaJugador} />
         )}
@@ -128,16 +128,16 @@ export default function Juego() {
 
 function Portada({ onStart }: { onStart: () => void }) {
   return (
-    <main className="mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-10 px-6 py-24">
+    <main className="grano mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-10 px-6 py-24">
       <div className="space-y-5 text-center">
-        <h1 className="text-6xl font-bold tracking-tight text-agua">VIGILIA</h1>
-        <p className="text-sm leading-relaxed text-dim">
+        <h1 className="text-7xl font-bold tracking-[0.08em] text-agua drop-shadow-[0_0_28px_rgba(63,217,196,0.35)]">VIGILIA</h1>
+        <p className="text-base leading-relaxed text-dim">
           Hace tres días que no dormís bien.
           <br />
           Ya no estás seguro de cuál de los dos mundos te espera despierto.
         </p>
       </div>
-      <Sprite materiaId="biologia" clase="respira" />
+      <EnPie materiaId="biologia" clase="respira" />
       <button
         onClick={onStart}
         className="w-full bg-agua px-8 py-4 text-sm font-bold tracking-[0.2em] text-background transition-opacity hover:opacity-80"
@@ -158,11 +158,15 @@ function glifo(
   y: number,
   px: number,
 ) {
+  const base = ctx.globalAlpha;
   data.forEach((fila, gy) =>
     fila.split("").forEach((ch, gx) => {
-      if (ch === "#") ctx.fillRect(x + gx * px, y + gy * px, px, px);
+      if (ch === ".") return;
+      ctx.globalAlpha = ch === "+" ? base * 0.42 : base;
+      ctx.fillRect(x + gx * px, y + gy * px, px, px);
     }),
   );
+  ctx.globalAlpha = base;
 }
 
 function Pasillo({
@@ -288,21 +292,52 @@ function Pasillo({
       ctx.fillStyle = "#05100e";
       ctx.fillRect(camX, camY, anchoVista, altoVista);
 
-      // Piso del pasillo y aulas de fondo.
+      // Paredes, piso y aulas de fondo.
       for (let ty = 0; ty < mundo.alto; ty++) {
         for (let tx = 0; tx < mundo.ancho; tx++) {
           const t = tileEn(mundo, tx, ty);
+          const X = tx * TILE;
+          const Y = ty * TILE;
           if (t === PISO) {
             ctx.fillStyle = "#0d1f1c";
-            ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
-            ctx.fillStyle = "#122a26";
-            ctx.fillRect(tx * TILE, ty * TILE + TILE - 1, TILE, 1);
+            ctx.fillRect(X, Y, TILE, TILE);
+            // Baldosas: junta abajo y a la derecha.
+            ctx.fillStyle = "#112824";
+            ctx.fillRect(X, Y + TILE - 1, TILE, 1);
+            ctx.fillRect(X + TILE - 1, Y, 1, TILE);
           } else if (t === SALA) {
             // El aula se ve a través de la pared, apagada.
             ctx.fillStyle = ty % 2 === 0 ? "#091613" : "#0a1815";
-            ctx.fillRect(tx * TILE, ty * TILE, TILE, TILE);
+            ctx.fillRect(X, Y, TILE, TILE);
+          } else {
+            // Pared de bloques, con la hilada corrida una fila sí y una no.
+            ctx.fillStyle = "#0a1512";
+            ctx.fillRect(X, Y, TILE, TILE);
+            ctx.fillStyle = "#0e1d19";
+            ctx.fillRect(X + 1, Y + 1, TILE - 2, TILE - 2);
+            ctx.fillStyle = "#0a1512";
+            const corrida = ty % 2 === 0 ? 0 : TILE / 2;
+            ctx.fillRect(X + corrida, Y, 1, TILE);
+            // Zócalo donde la pared toca el pasillo.
+            if (tileEn(mundo, tx, ty + 1) === PISO) {
+              ctx.fillStyle = "#16302b";
+              ctx.fillRect(X, Y + TILE - 2, TILE, 2);
+            }
           }
         }
+      }
+
+      // Luz saliendo de cada puerta que todavía no usaste.
+      for (const pu of mundo.puertas) {
+        if (pu.usada) continue;
+        const cx = pu.x * TILE + TILE / 2;
+        const cy = pu.y * TILE + TILE / 2;
+        const luz = ctx.createRadialGradient(cx, cy, 1, cx, cy, TILE * 2.6);
+        const tono = pu.profesor ? "226,104,92" : "63,217,196";
+        luz.addColorStop(0, `rgba(${tono},0.20)`);
+        luz.addColorStop(1, `rgba(${tono},0)`);
+        ctx.fillStyle = luz;
+        ctx.fillRect(cx - TILE * 2.6, cy - TILE * 2.6, TILE * 5.2, TILE * 5.2);
       }
 
       // El símbolo de cada materia, difuminado, en el fondo de su aula.
@@ -341,10 +376,32 @@ function Pasillo({
         }
       }
 
+      // El chico: sombra al pie, cuerpo con un lado más oscuro, y la mirada.
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + CUERPO / 2, CUERPO * 0.55, 2.5, 0, 0, Math.PI * 2);
+      ctx.fill();
       ctx.fillStyle = "#cfe3de";
       ctx.fillRect(p.x - CUERPO / 2, p.y - CUERPO / 2, CUERPO, CUERPO);
-      ctx.fillStyle = "#3fd9c4";
-      ctx.fillRect(p.x - 2 + mirando.x * 3, p.y - 2 + mirando.y * 3, 4, 3);
+      ctx.fillStyle = "#8aa9a1";
+      ctx.fillRect(p.x + CUERPO / 2 - 2, p.y - CUERPO / 2, 2, CUERPO);
+      ctx.fillRect(p.x - CUERPO / 2, p.y + CUERPO / 2 - 2, CUERPO, 2);
+      ctx.fillStyle = "#05100e";
+      ctx.fillRect(p.x - 2 + mirando.x * 3, p.y - 2 + mirando.y * 3, 4, 2);
+
+      // Viñeta: el pasillo se pierde en negro hacia los bordes.
+      const vin = ctx.createRadialGradient(
+        p.x,
+        p.y,
+        TILE * 2,
+        p.x,
+        p.y,
+        Math.max(anchoVista, altoVista) * 0.75,
+      );
+      vin.addColorStop(0, "rgba(5,16,14,0)");
+      vin.addColorStop(1, "rgba(5,16,14,0.92)");
+      ctx.fillStyle = vin;
+      ctx.fillRect(camX, camY, anchoVista, altoVista);
 
       raf = requestAnimationFrame(frame);
     };
@@ -360,7 +417,7 @@ function Pasillo({
   const c = confundido(state);
 
   return (
-    <main className="mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-5 py-8">
+    <main className="grano mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-5 py-8">
       <Cabecera state={state} />
 
       <div
@@ -459,12 +516,23 @@ function Pasillo({
 
 // --- piezas ---------------------------------------------------------------
 
-/** Dibuja una grilla de texto como bloques. Toma el color de currentColor. */
-function Pixeles({ data, clase = "" }: { data: string[]; clase?: string }) {
+/**
+ * Dibuja una grilla de texto como bloques. `#` es el color pleno y `+` una
+ * versión apagada: con esos dos tonos las figuras tienen contorno y relleno.
+ */
+function Pixeles({
+  data,
+  clase = "",
+  muriendo,
+}: {
+  data: string[];
+  clase?: string;
+  muriendo?: boolean;
+}) {
   const cols = data[0].length;
   return (
     <div
-      className={`grid ${clase}`}
+      className={`grid ${clase} ${muriendo ? "muere" : ""}`}
       style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
       aria-hidden
     >
@@ -473,7 +541,12 @@ function Pixeles({ data, clase = "" }: { data: string[]; clase?: string }) {
           <div
             key={`${x}-${y}`}
             className="aspect-square"
-            style={{ background: ch === "#" ? "currentColor" : "transparent" }}
+            style={{
+              background: ch === "." ? "transparent" : "currentColor",
+              opacity: ch === "+" ? 0.42 : 1,
+              // Cada píxel se suelta un poco después que el de al lado.
+              animationDelay: muriendo ? `${(y * cols + x) * 7}ms` : undefined,
+            }}
           />
         )),
       )}
@@ -481,12 +554,43 @@ function Pixeles({ data, clase = "" }: { data: string[]; clase?: string }) {
   );
 }
 
-function Sprite({ materiaId, clase = "" }: { materiaId: string; clase?: string }) {
+function Sprite({
+  materiaId,
+  clase = "",
+  muriendo,
+}: {
+  materiaId: string;
+  clase?: string;
+  muriendo?: boolean;
+}) {
   return (
     <Pixeles
       data={SPRITES[materiaId] ?? SPRITES.matematica}
       clase={`w-40 text-agua ${clase}`}
+      muriendo={muriendo}
     />
+  );
+}
+
+/** El sprite con una sombra elíptica abajo, para que no flote. */
+function EnPie({
+  materiaId,
+  clase = "",
+  muriendo,
+}: {
+  materiaId: string;
+  clase?: string;
+  muriendo?: boolean;
+}) {
+  return (
+    <div className="flex flex-col items-center">
+      <Sprite materiaId={materiaId} clase={clase} muriendo={muriendo} />
+      <div
+        className={`mt-2 h-2 w-28 rounded-[50%] bg-agua/15 blur-[2px] transition-opacity duration-700 ${
+          muriendo ? "opacity-0" : "opacity-100"
+        }`}
+      />
+    </div>
   );
 }
 
@@ -828,14 +932,16 @@ function Combate({
 
       <div
         key={`herido-${herido}`}
-        className={`flex flex-col items-center gap-3 border p-5 ${
-          enemigo.profesor ? "border-malo" : "border-dimmer"
+        className={`flex flex-col items-center gap-3 border p-6 ${
+          enemigo.profesor
+            ? "border-malo bg-[radial-gradient(ellipse_at_center,rgba(226,104,92,0.09),transparent_70%)]"
+            : "border-borde bg-[radial-gradient(ellipse_at_center,rgba(63,217,196,0.05),transparent_70%)]"
         } ${herido > 0 ? "sacude" : ""}`}
       >
         <div key={`golpe-${golpe}`} className={golpe > 0 ? "sacude" : "respira"}>
-          <Sprite materiaId={c.materiaId} />
+          <EnPie materiaId={c.materiaId} />
         </div>
-        <p className="text-center text-sm">{enemigo.nombre}</p>
+        <p className="text-center text-lg leading-tight">{enemigo.nombre}</p>
         <div className="w-full space-y-1">
           <Barra valor={vidaEnemigo} max={c.vidaMax} color="bg-malo" />
           <div className="text-right text-sm tabular-nums text-dim">
@@ -937,7 +1043,7 @@ function Boton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="border border-dimmer p-3 text-center transition-colors hover:border-agua disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-dimmer"
+      className="group border border-borde p-3 text-center transition-all hover:border-agua hover:bg-agua/10 active:bg-agua/20 disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-borde disabled:hover:bg-transparent"
     >
       <div className="truncate text-sm font-bold">{label}</div>
       {sub && <div className="mt-0.5 text-sm text-dim">{sub}</div>}
@@ -1003,6 +1109,15 @@ function Recompensa({
   const nueva = state.armaOfrecida;
   return (
     <section className="space-y-4 border border-agua-hondo p-5">
+      {state.caido && (
+        <div className="flex flex-col items-center gap-3 border-b border-borde-suave pb-5">
+          <EnPie materiaId={state.caido.materiaId} muriendo />
+          <p className="text-sm text-dim line-through decoration-malo">
+            {ENEMIGOS[state.caido.enemigoId].nombre}
+          </p>
+        </div>
+      )}
+
       <p className="text-sm tracking-widest text-agua">
         {state.cicloTerminado ? "SE TERMINÓ EL DÍA" : "EL AULA QUEDA VACÍA"}
       </p>

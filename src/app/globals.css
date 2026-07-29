@@ -42,11 +42,66 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-mono), ui-monospace, monospace;
   -webkit-font-smoothing: antialiased;
+  /* Un poco de luz en el centro y oscuridad en los bordes. */
+  background-image: radial-gradient(
+    ellipse 120% 80% at 50% 30%,
+    #0a1a17 0%,
+    #05100e 70%
+  );
+  background-attachment: fixed;
 }
 
 ::selection {
   background: var(--agua);
   color: var(--background);
+}
+
+/*
+ * La muerte de un enemigo: cada píxel se suelta por su cuenta, con un retraso
+ * distinto, así la figura se desarma en vez de desaparecer de golpe.
+ */
+@keyframes caer-pixel {
+  0% {
+    opacity: 1;
+    transform: none;
+  }
+  25% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+  100% {
+    opacity: 0;
+    transform: translateY(18px) rotate(25deg);
+  }
+}
+.muere > div {
+  animation: caer-pixel 0.85s cubic-bezier(0.4, 0, 0.7, 1) forwards;
+}
+
+/* Grano fino sobre todo: la pantalla nunca termina de estar quieta. */
+@keyframes latir-grano {
+  0%,
+  100% {
+    opacity: 0.055;
+  }
+  50% {
+    opacity: 0.085;
+  }
+}
+.grano::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+  animation: latir-grano 4s ease-in-out infinite;
+  background-image: repeating-linear-gradient(
+    0deg,
+    rgba(207, 227, 222, 0.6) 0px,
+    rgba(207, 227, 222, 0.6) 1px,
+    transparent 1px,
+    transparent 3px
+  );
 }
 
 /* Latido lento del sprite: nada de animación de personaje, sólo presencia. */

@@ -2,14 +2,15 @@
  * Sprites como texto. Se renderizan en CSS como una grilla de bloques, así que
  * tenemos pixel art sin depender de un solo archivo de imagen.
  *
+ * Dos tonos: `#` es el color pleno y `+` una versión apagada del mismo color.
+ * Con eso alcanza para que las formas tengan contorno y relleno, que es lo que
+ * las hace leerse como una figura y no como una mancha.
+ *
  * Uno por materia. Abstractos y no literales: el terror onírico funciona mejor
  * cuando la forma casi se reconoce.
  */
 
-/**
- * Íconos de 5×5 para las puertas del pasillo. Un símbolo por materia, así el
- * aula se reconoce de lejos sin leer el cartel.
- */
+/** Íconos de 5×5 para las puertas del pasillo. */
 export const ICONOS: Record<string, string[]> = {
   matematica: ["..#..", "..#..", "#####", "..#..", "..#.."],
   literatura: [".....", "##.##", "#####", "##.##", "....."],
@@ -24,82 +25,88 @@ export const ICONOS_EFECTO: Record<string, string[]> = {
   // Un signo de pregunta: dejaste de entender.
   confusion: [".###.", "#...#", "...#.", ".....", "..#.."],
   // Un ojo abierto de más.
-  miedo: [".###.", "#...#", "#.#.#", "#...#", ".###."],
+  miedo: [".###.", "#+++#", "#+#+#", "#+++#", ".###."],
   // Un aspa: el cuerpo no va donde lo mandás.
   torpeza: ["#...#", ".#.#.", "..#..", ".#.#.", "#...#"],
 };
 
 export const SPRITES: Record<string, string[]> = {
+  // Un símbolo que se partió y quedó mirándote.
   matematica: [
     "....####....",
-    "...######...",
-    "..##.##.##..",
+    "...#++++#...",
+    "..#+#++#+#..",
     "..#..##..#..",
-    "..########..",
+    "..#++++++#..",
     "..##....##..",
     "...#.##.#...",
     "....####....",
     ".....##.....",
     "....#..#....",
   ],
+  // El cráneo del rincón, con las cuencas vacías.
   biologia: [
     "...######...",
-    "..########..",
-    ".##.####.##.",
-    ".##.####.##.",
-    ".##########.",
-    "..###..###..",
-    "...######...",
+    "..#++++++#..",
+    ".#+#....#+#.",
+    ".#+#....#+#.",
+    ".#++++++++#.",
+    "..#++..++#..",
+    "...#++++#...",
     "...#.##.#...",
     "...#.##.#...",
     "....####....",
   ],
+  // Algo que sube por el vidrio.
   quimica: [
     ".....##.....",
     ".....##.....",
-    "....####....",
-    "....####....",
-    "...######...",
-    "..###..###..",
-    ".####..####.",
-    ".##########.",
+    "....#++#....",
+    "....#++#....",
+    "...#++++#...",
+    "..#++..++#..",
+    ".#++....++#.",
+    ".#++++++++#.",
     ".##########.",
     "..########..",
   ],
+  // Un arco que vuelve al mismo lugar.
   historia: [
     "..########..",
-    ".##########.",
-    "##........##",
-    "##..####..##",
-    "##..####..##",
-    "##........##",
-    ".##########.",
+    ".#++++++++#.",
+    "#+#......#+#",
+    "#+#..##..#+#",
+    "#+#..##..#+#",
+    "#+#......#+#",
+    ".#++++++++#.",
     "..########..",
     "...#....#...",
     "..##....##..",
   ],
+  // Un libro abierto que no se cierra.
   literatura: [
     "............",
     ".##......##.",
-    ".###....###.",
-    ".####..####.",
-    ".##########.",
-    ".##########.",
-    ".####..####.",
-    ".###....###.",
+    ".#+#....#+#.",
+    ".#++#..#++#.",
+    ".#+++##+++#.",
+    ".#+++##+++#.",
+    ".#++#..#++#.",
+    ".#+#....#+#.",
     ".##......##.",
     "............",
   ],
+  // Algo redondo que viene rebotando.
   fisica: [
-    ".....##.....",
-    ".....##.....",
     "....####....",
-    "...##..##...",
-    "..##....##..",
-    ".##......##.",
-    "##........##",
-    ".##......##.",
-    "..##....##..",
-    "...######...",
+    "...#++++#...",
+    "..#+#..#+#..",
+    ".#++#..#++#.",
+    ".#+#....#+#.",
+    ".#+#....#+#.",
+    ".#++#..#++#.",
+    "..#+#..#+#..",
+    "...#++++#...",
+    "....####....",
   ],
 };
