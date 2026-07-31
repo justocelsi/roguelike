@@ -699,17 +699,21 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
   const pasivosDeSueño = j.poderes.filter((id) => PODERES[id].pasivo);
   const activos = j.poderes.filter((id) => !PODERES[id].pasivo);
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-background/98">
-      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 overflow-y-auto px-5 py-6">
-        <div className="flex items-baseline justify-between">
-          <h2 className="text-lg font-bold tracking-widest text-agua">LO QUE LLEVÁS</h2>
+    <div className="fixed inset-0 z-[80] flex flex-col bg-background">
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col overflow-hidden">
+        {/* El encabezado queda quieto y el contenido scrollea por debajo. */}
+        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-borde px-5 py-4">
+          <h2 className="truncate text-lg font-bold tracking-widest text-agua">
+            LO QUE LLEVÁS
+          </h2>
           <button
             onClick={onCerrar}
-            className="border border-borde px-4 py-2 text-sm tracking-widest text-dim hover:border-agua hover:text-foreground"
+            className="shrink-0 border border-borde px-4 py-2 text-sm tracking-widest text-dim hover:border-agua hover:text-foreground"
           >
             CERRAR
           </button>
         </div>
+        <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-5 py-5">
 
         <Seccion titulo="ARMAS" vacio="Con las manos.">
           {j.armas.map((id) => (
@@ -789,6 +793,7 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
             </Ficha>
           ))}
         </Seccion>
+        </div>
       </div>
     </div>
   );
@@ -808,9 +813,10 @@ function Seccion({
 }: {
   titulo: string;
   vacio: string;
-  children: React.ReactNode[];
+  children: React.ReactNode;
 }) {
-  const hay = children.flat().filter(Boolean).length > 0;
+  // Puede llegar un array, varios arrays o un hijo suelto: se aplana todo.
+  const hay = [children].flat(3).filter(Boolean).length > 0;
   return (
     <section className="space-y-2">
       <h3 className="text-sm tracking-[0.3em] text-dim">{titulo}</h3>
@@ -871,28 +877,28 @@ function Cabecera({
   const vida = vidaMostrada ?? j.vida;
   return (
     <header className="shrink-0 space-y-2">
-      <div className="flex items-baseline justify-between text-sm tracking-widest text-dim">
-        <span className="text-agua">
+      <div className="flex items-center justify-between gap-3 text-sm">
+        <span className="shrink-0 tracking-widest text-agua">
           CICLO {state.ciclo}/{CICLOS}
         </span>
-        <div className="flex items-center gap-3">
-          <span className="text-oro">
-            {j.armas.length
-              ? j.armas.map((id) => `${ARMAS[id].nombre} ×${usosTexto(state, id)}`).join(" · ")
-              : "con las manos"}
-          </span>
-          {onInventario && (
-            <button
-              onClick={onInventario}
-              title="Ver todo lo que llevás"
-              className="flex items-center gap-1.5 border border-borde px-2 py-1 tracking-widest text-dim transition-colors hover:border-agua hover:text-foreground"
-            >
-              <Pixeles data={ICONOS_ACCION.usar} clase="w-3 shrink-0 text-oro" />
-              BOLSILLO
-            </button>
-          )}
-        </div>
+        {onInventario && (
+          <button
+            onClick={onInventario}
+            title="Ver todo lo que llevás"
+            className="flex shrink-0 items-center gap-1.5 border border-borde px-2.5 py-1 tracking-widest text-dim transition-colors hover:border-agua hover:text-foreground"
+          >
+            <Pixeles data={ICONOS_ACCION.usar} clase="w-3 shrink-0 text-oro" />
+            BOLSILLO
+          </button>
+        )}
       </div>
+      {/* Las armas en su propio renglón: con tres puestas la lista es larga y
+          chocaba contra el ciclo en pantallas angostas. */}
+      <p className="truncate text-sm text-oro">
+        {j.armas.length
+          ? j.armas.map((id) => `${ARMAS[id].nombre} ×${usosTexto(state, id)}`).join(" · ")
+          : "con las manos"}
+      </p>
       <Barra valor={vida} max={j.vidaMax} />
       <div className="flex justify-between text-sm text-dim">
         <span className="tabular-nums">
@@ -1339,11 +1345,15 @@ function describirBotin(b: State["botin"][number]): {
   nombre: string;
   que: string;
   como: string;
+  icono: string[];
+  tono: string;
 } {
   switch (b.tipo) {
     case "item": {
       const it = ITEMS[b.id];
       return {
+        icono: ICONOS_ITEM[b.id],
+        tono: tonoItem(b.id),
         nombre: `${it.nombre} (${NOMBRE_RAREZA[it.rareza]})`,
         que: it.descripcion,
         como: `Se usa desde USAR y no gasta el turno. Se gasta para siempre: acierta ${Math.round(it.precision * 100)} de cada 100 veces.`,
@@ -1352,6 +1362,8 @@ function describirBotin(b: State["botin"][number]): {
     case "arma": {
       const a = ARMAS[b.id];
       return {
+        icono: ICONOS_ACCION.arma,
+        tono: "text-oro",
         nombre: a.nombre,
         que: `${a.daño} de daño, acierta ${Math.round(a.precision * 100)} de cada 100.`,
         como: a.infinita
@@ -1361,18 +1373,24 @@ function describirBotin(b: State["botin"][number]): {
     }
     case "sombra":
       return {
+        icono: ICONOS_EFECTO.confusion,
+        tono: "text-sueno",
         nombre: `la sombra de ${ENEMIGOS[b.id].nombre}`,
         que: "Te saca los estados que tengas encima.",
         como: "Se usa desde USAR. Es de un solo uso y no vuelve.",
       };
     case "vida":
       return {
+        icono: ICONOS_ITEM.venda,
+        tono: "text-salud",
         nombre: `${b.cantidad} de vida máxima`,
         que: "Aguantás más en cada pelea, para siempre.",
         como: "No hay que hacer nada: ya está aplicado.",
       };
     case "potencia":
       return {
+        icono: ICONOS_ACCION.atacar,
+        tono: "text-oro",
         nombre: `${b.cantidad}% más de daño`,
         que: "Todo lo que hacés pega más fuerte: puño, armas, items, bloqueo.",
         como: "Es permanente y se acumula con cada profesor que vencés.",
@@ -1413,16 +1431,18 @@ function Recompensa({
             {state.botin.map((b, i) => {
               const d = describirBotin(b);
               return (
-                <li key={i} className="border border-borde px-3 py-2">
-                  <div className="flex items-baseline gap-2">
-                    <span className="text-agua">+</span>
-                    <span className="text-base text-foreground">{d.nombre}</span>
-                    {b.cantidad > 1 && (
-                      <span className="tabular-nums text-agua">×{b.cantidad}</span>
-                    )}
+                <li key={i} className="flex gap-3 border border-borde px-3 py-2.5">
+                  <Pixeles data={d.icono} clase={`mt-1 w-5 shrink-0 ${d.tono}`} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-baseline gap-x-2">
+                      <span className={`text-base ${d.tono}`}>{d.nombre}</span>
+                      {b.cantidad > 1 && (
+                        <span className="tabular-nums text-agua">×{b.cantidad}</span>
+                      )}
+                    </div>
+                    <p className="text-sm leading-snug text-foreground">{d.que}</p>
+                    <p className="text-sm leading-snug text-dim">{d.como}</p>
                   </div>
-                  <p className="text-sm leading-snug text-foreground">{d.que}</p>
-                  <p className="text-sm leading-snug text-dim">{d.como}</p>
                 </li>
               );
             })}

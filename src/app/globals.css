@@ -5,6 +5,15 @@
  * tipografía grande, cero degradés.
  */
 /*
+ * ORDEN DE CAPAS. Estaba repartido entre el CSS y el TSX, que es cómo aparecen
+ * las superposiciones sin que nadie las decida. De abajo hacia arriba:
+ *
+ *   40  el estado que te agarra, a pantalla completa
+ *   50  el destello rojo del golpe
+ *   60  el grano
+ *   70  la explicación que aparece al pasar por encima de una etiqueta
+ *   80  el inventario, que tapa todo lo demás
+ *
  * Contrastes medidos contra el fondo, en ratio WCAG. Todo lo que lleva texto
  * pasa AA para texto normal (4.5). Los dos tokens de abajo son sólo para
  * bordes y rellenos, nunca para letras.
