@@ -58,7 +58,8 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 10 invariantes automáticas sobre 1500 partidas.
+Verificado con 11 invariantes automáticas. El banco de pruebas vive en
+`scripts/balance.ts`.
 
 ### Salas icónicas
 
@@ -109,18 +110,22 @@ más" sino "qué corresponde ahora".
 | Acción | Qué hace |
 |---|---|
 | **ATACAR** | 6 de daño. A mano limpia no le hacés gran cosa a esto |
-| **BLOQUEAR** | 90% de que salga. Si sale, sólo entra el 40% del golpe **y le devolvés 3** |
+| **BLOQUEAR** | 90% de que salga. Si sale, **para el golpe entero y también los estados**, y le devolvés 5 |
 | **ARMA** | Daño alto y usos contados **por pelea**. Es lo que hacés en los turnos en que no te cubrís |
-| **USAR** | Item, sombra o poder |
+| **USAR** | Item, sombra o poder. **No gasta el turno** |
 | **HUIR** | Salís al pasillo. Contra un profesor la puerta no abre |
 
 El puño es débil a propósito, y esa es la pieza que sostiene el pasillo: sin
 arma, los turnos en que no te cubrís no valen nada.
 
-**Bloquear nunca devuelve más que un ataque**, y deja pasar el 40% del golpe.
-Si devolviera más, no habría razón para atacar cuando ves venir un golpe; si
-anulara todo, no existiría la opción de correr a matarlo antes. Esas dos reglas
-son lo que hace que el turno sea una decisión y no un reflejo.
+**Bloquear nunca devuelve más que un ataque.** Si devolviera más, no habría
+razón para atacar cuando ves venir un golpe. Lo que impide que bloquear sea la
+respuesta a todo son dos reglas: hay **golpes imparables** que lo atraviesan, y
+bloquear casi no hace daño — sobrevivís, pero no avanzás.
+
+**Los consumibles no gastan el turno.** Usar un item no cuesta tiempo, cuesta
+el item: la pregunta deja de ser "¿vale la pena perder un turno?" y pasa a ser
+"¿lo quemo ahora o lo guardo para el profesor?".
 
 **Cada profesor vencido suma +40% de daño a todo lo que hacés.** Sin eso los
 enemigos escalan por ciclo y tus números se quedan atrás: sin progresión, todos
@@ -136,7 +141,12 @@ No son números, son reglas que cambian mientras duran:
 
 - **Confusión** — los números de la interfaz se muestran mal.
 - **Miedo** — tu acción puede fallar directamente.
-- **Torpeza** — el enemigo actúa dos veces por turno tuyo.
+- **Torpeza** — el enemigo actúa dos veces por turno tuyo, **desde el turno
+  siguiente**. Mientras la tengas, la interfaz te muestra los dos avisos: todo
+  lo que te pasa tiene que haber estado anunciado.
+
+Se pueden bloquear, salvo que la intención sea imparable. Contra un profesor
+duran la mitad.
 
 ### Vida
 
