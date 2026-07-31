@@ -59,8 +59,27 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 16 invariantes automáticas y 42 comprobaciones de números
+Verificado con 16 invariantes automáticas y 43 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
+
+## El umbral
+
+Abrir una puerta no muestra el aula de golpe. La pantalla arranca negra, la luz
+sube sola, y recién después lo que hay adentro toma forma.
+
+**El suspenso no está en lo que hay adentro, sino en el rato en que todavía no
+sabés qué hay.** Por eso las tres clases de aula comparten la misma caja, el
+mismo ritmo y la misma luz hasta el momento de revelar: si el aula vacía se
+viera distinta desde el primer frame, no habría suspenso, habría un cartel.
+
+El aula vacía tiene un beat de más. Primero ves que no hay nadie —que es el
+momento en que aflojás— y recién ahí aparece lo que había.
+
+La puerta del profesor es la única que se tiñe distinto, porque es la única que
+se lee desde el pasillo: ya sabías lo que ibas a cruzar.
+
+Se puede adelantar tocando o con cualquier tecla. En la run número diez el
+suspenso ya lo viste, y hacerlo obligatorio lo convertiría en un peaje.
 
 ## Qué hay detrás de una puerta
 

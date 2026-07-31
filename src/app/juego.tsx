@@ -46,11 +46,20 @@ import {
 import type { Accion, Action, Entrada, Intencion, State } from "@/game/types";
 
 /** Cuánto dura un evento común en pantalla. */
-const RITMO = 700;
+const RITMO = 780;
 /** El último evento de una mano se queda más: es el turno cambiando de lado. */
-const RITMO_TURNO = 1100;
+const RITMO_TURNO = 1350;
 /** El aviso del enemigo: es lo único que hay que leer para decidir. */
-const RITMO_AVISO = 1900;
+const RITMO_AVISO = 2000;
+
+/*
+ * Los beats del umbral: la puerta, la luz subiendo, y lo que hay adentro
+ * tomando forma. El aula vacía tiene un beat más —el objeto aparece después de
+ * que ya viste que no hay nadie— y por eso hasta ese momento las tres clases de
+ * aula tienen que verse exactamente igual.
+ */
+const BEATS_UMBRAL = [850, 1500, 1400];
+const BEAT_PREMIO = 1700;
 
 const SIN_LOG: Entrada[] = [];
 
@@ -62,9 +71,19 @@ export default function Juego() {
   const pos = useRef<{ x: number; y: number } | null>(null);
   const cicloAnterior = useRef(1);
   const [verInventario, setVerInventario] = useState(false);
+  /*
+   * Lo que se está contando de la entrada a un aula. Mientras esté puesto tapa
+   * todo, y la secuencia del log espera: si no esperara, el primer aviso del
+   * enemigo se consumiría atrás del umbral y entrarías a la pelea sin haberlo
+   * leído.
+   */
+  const [umbral, setUmbral] = useState<DatoUmbral | null>(null);
   // La secuencia también vive acá: el golpe que mata cambia de pantalla, y
   // esas líneas tienen que terminar de verse igual.
-  const { actual, contando, restantes } = useSecuencia(state?.log ?? SIN_LOG);
+  const { actual, contando, restantes } = useSecuencia(
+    state?.log ?? SIN_LOG,
+    umbral !== null,
+  );
   /*
    * El aula no se abandona en medio de una secuencia.
    *
@@ -85,6 +104,23 @@ export default function Juego() {
     state && state.fase !== "combate" && contando && ultimoCombate.current?.combate
       ? ultimoCombate.current
       : null;
+
+  /*
+   * Entrar se resuelve acá y no en `dispatch` porque el umbral necesita el
+   * estado de después: qué había atrás de la puerta se sabe recién cuando el
+   * motor lo sorteó. Se reduce una sola vez y se guarda ese mismo resultado.
+   */
+  const entrarAlAula = (p: Puerta) => {
+    if (!state) return;
+    const siguiente = reduce(state, {
+      type: "entrar-aula",
+      puertaX: p.x,
+      puertaY: p.y,
+    });
+    if (siguiente === state) return;
+    setUmbral(leerUmbral(siguiente, p));
+    setState(siguiente);
+  };
 
   if (!state) {
     return (
@@ -108,6 +144,9 @@ export default function Juego() {
   const inventario = verInventario ? (
     <Inventario state={state} onCerrar={() => setVerInventario(false)} />
   ) : null;
+  const puerta = umbral ? (
+    <Umbral dato={umbral} onFin={() => setUmbral(null)} />
+  ) : null;
 
   // Huir también cierra el aula, y su línea también hay que verla.
   if (state.fase === "pasillo" && state.mundo && !congelado) {
@@ -120,7 +159,7 @@ export default function Juego() {
           state={state}
           mundo={state.mundo}
           pos={pos}
-          onEntrar={(p) => dispatch({ type: "entrar-aula", puertaX: p.x, puertaY: p.y })}
+          onEntrar={entrarAlAula}
         />
       </>
     );
@@ -130,6 +169,7 @@ export default function Juego() {
     <>
       {evento}
       {inventario}
+      {puerta}
       {/*
         El combate entra entero en la pantalla y no se scrollea: mirar para
         abajo en medio de un turno es perder el hilo de lo que está pasando.
@@ -673,6 +713,157 @@ function EnPie({
   );
 }
 
+// --- el umbral ------------------------------------------------------------
+
+/** Lo que hace falta para contar la entrada a un aula. */
+type DatoUmbral = {
+  materiaId: string;
+  materia: string;
+  que: "pelea" | "bendicion" | "juego";
+  enemigoId?: string;
+  itemId?: string;
+};
+
+/** Qué había atrás de la puerta, leído del estado que devolvió el motor. */
+function leerUmbral(s: State, p: Puerta): DatoUmbral {
+  const base = { materiaId: p.materiaId, materia: nombreDe(s, p.materiaId) };
+  if (s.combate) return { ...base, que: "pelea", enemigoId: s.combate.enemigoId };
+  if (s.fase === "juego") return { ...base, que: "juego" };
+  const item = s.botin.find((b) => b.tipo === "item");
+  return { ...base, que: "bendicion", itemId: item?.id };
+}
+
+/**
+ * El umbral: lo que pasa entre abrir la puerta y ver qué hay.
+ *
+ * Entrar a un aula tiene que dar miedo, y el miedo no está en lo que hay
+ * adentro sino en el rato en que todavía no sabés qué hay. Por eso los tres
+ * finales posibles comparten la misma caja, el mismo ritmo y la misma luz hasta
+ * el beat de revelar: si el aula vacía se viera distinta desde el primer frame,
+ * no habría suspenso, habría un cartel.
+ *
+ * El aula vacía tiene un beat de más. Primero ves que no hay nadie —que es el
+ * momento en que aflojás— y recién después aparece lo que había.
+ *
+ * Se puede adelantar tocando o con cualquier tecla: en la run número diez el
+ * suspenso ya lo viste, y hacerlo obligatorio lo convertiría en un peaje.
+ */
+function Umbral({ dato, onFin }: { dato: DatoUmbral; onFin: () => void }) {
+  const [paso, setPaso] = useState(0);
+  const beats =
+    dato.que === "bendicion" && dato.itemId ? [...BEATS_UMBRAL, BEAT_PREMIO] : BEATS_UMBRAL;
+  // Por ref, para que volver a pintar no reinicie el reloj del beat en curso.
+  const fin = useRef(onFin);
+  fin.current = onFin;
+
+  useEffect(() => {
+    if (paso >= beats.length) {
+      fin.current();
+      return;
+    }
+    const t = setTimeout(() => setPaso((p) => p + 1), beats[paso]);
+    return () => clearTimeout(t);
+  }, [paso, beats.length]);
+
+  useEffect(() => {
+    // `repeat` es el auto-repeat de una tecla que quedó apretada: si venías
+    // caminando con la W, se comería el umbral entero en un par de frames.
+    const conTecla = (e: KeyboardEvent) => {
+      if (!e.repeat) setPaso((p) => p + 1);
+    };
+    const conDedo = () => setPaso((p) => p + 1);
+    window.addEventListener("keydown", conTecla);
+    window.addEventListener("pointerdown", conDedo);
+    return () => {
+      window.removeEventListener("keydown", conTecla);
+      window.removeEventListener("pointerdown", conDedo);
+    };
+  }, []);
+
+  const item = dato.itemId ? ITEMS[dato.itemId] : null;
+  /*
+   * La puerta del profesor se lee desde el pasillo, así que teñir su luz de
+   * rojo no delata nada que no supieras: es la única entrada del juego que
+   * podés decidir no cruzar todavía.
+   */
+  const profe = !!dato.enemigoId && ENEMIGOS[dato.enemigoId].profesor;
+  const luz = profe ? "rgba(226,104,92,0.18)" : "rgba(63,217,196,0.16)";
+
+  return (
+    <div className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-7 overflow-hidden bg-background px-8">
+      {/* La luz del aula subiendo. Es la misma en las tres: no puede delatar. */}
+      {paso >= 1 && (
+        <div
+          className="luz-sube pointer-events-none absolute inset-0"
+          style={{
+            background: `radial-gradient(ellipse 65% 50% at 50% 45%, ${luz} 0%, transparent 72%)`,
+          }}
+        />
+      )}
+
+      <p
+        className={`relative text-sm tracking-[0.35em] transition-opacity duration-1000 ${
+          paso >= 1 ? "text-dim opacity-100" : "opacity-0"
+        }`}
+      >
+        {dato.materia.toUpperCase()}
+      </p>
+
+      {/*
+        La caja donde aparece lo que hay. Alto fijo: si creciera con el
+        contenido, el salto del layout avisaría que algo apareció antes de que
+        se vea qué es.
+      */}
+      <div className="relative flex h-44 w-full max-w-xs items-center justify-center">
+        {paso >= 2 && dato.que === "pelea" && (
+          <div className="revela">
+            <EnPie materiaId={dato.materiaId} clase="respira" />
+          </div>
+        )}
+
+        {paso >= 2 && dato.que === "juego" && (
+          <div className="revela flex flex-col items-center gap-3">
+            <Pixeles data={ICONOS[dato.materiaId]} clase="w-16 text-oro" />
+          </div>
+        )}
+
+        {/* Vacía: primero el hueco, y el objeto recién en el beat siguiente. */}
+        {paso === 2 && dato.que === "bendicion" && (
+          <div className="revela h-24 w-24 rounded-full bg-[radial-gradient(circle,rgba(63,217,196,0.10),transparent_70%)]" />
+        )}
+        {paso >= 3 && item && (
+          <>
+            <div className="halo absolute h-32 w-32 rounded-full bg-[radial-gradient(circle,rgba(217,164,65,0.30),transparent_70%)]" />
+            <div className="emerge relative">
+              <Pixeles data={ICONOS_ITEM[dato.itemId!]} clase="w-24 text-oro" />
+            </div>
+          </>
+        )}
+      </div>
+
+      <div className="relative flex h-16 flex-col items-center gap-1.5 text-center">
+        {paso >= 2 && dato.que === "pelea" && (
+          <p className="aparece text-xl leading-tight text-malo">
+            {ENEMIGOS[dato.enemigoId!].nombre}
+          </p>
+        )}
+        {paso >= 2 && dato.que === "juego" && (
+          <p className="aparece text-xl leading-tight text-oro">Hay algo raro acá.</p>
+        )}
+        {paso === 2 && dato.que === "bendicion" && (
+          <p className="aparece text-xl leading-tight text-dim">No hay nadie.</p>
+        )}
+        {paso >= 3 && item && (
+          <>
+            <p className="aparece text-sm tracking-[0.3em] text-dim">PERO HABÍA ESTO</p>
+            <p className="aparece text-xl leading-tight text-oro">{item.nombre}</p>
+          </>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function Barra({ valor, max, color = "bg-agua" }: { valor: number; max: number; color?: string }) {
   const bloques = 24;
   // Si seguís vivo tiene que verse algo: con 1 de vida el redondeo daba cero
@@ -1000,7 +1191,7 @@ function Cabecera({
  * remate que mata al enemigo cambia de fase, y esas líneas también tienen que
  * verse: si no, el mejor momento del combate se lo come el cambio de pantalla.
  */
-function useSecuencia(log: Entrada[]) {
+function useSecuencia(log: Entrada[], pausado = false) {
   const [cola, setCola] = useState<{ entrada: Entrada; dura: number }[]>([]);
   const [actual, setActual] = useState<Entrada | null>(null);
   const cabeza = useRef<Entrada | null | undefined>(undefined);
@@ -1035,11 +1226,14 @@ function useSecuencia(log: Entrada[]) {
       setActual(null);
       return;
     }
+    // Con el umbral puesto la cola queda esperando: los eventos de entrar al
+    // aula no se pueden gastar atrás de una pantalla que los tapa.
+    if (pausado) return;
     const [primero, ...resto] = cola;
     setActual(primero.entrada);
     const t = setTimeout(() => setCola(resto), primero.dura);
     return () => clearTimeout(t);
-  }, [cola]);
+  }, [cola, pausado]);
 
   /*
    * La cola se arma en un efecto, o sea después de pintar. En el render en que

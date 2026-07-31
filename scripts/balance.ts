@@ -15,7 +15,8 @@
  * mirarlo por abajo. Un bot que hace trampa da números que no sirven.
  */
 
-import { ARMAS, ENEMIGOS, ITEMS, MATERIAS } from "../src/game/content";
+import { ARMAS, ENEMIGOS, ITEMS, ITEM_IDS, MATERIAS } from "../src/game/content";
+import { ICONOS_ITEM } from "../src/game/sprites";
 
 import {
   armasUsables,
@@ -594,6 +595,17 @@ function juegos() {
     }
   }
   debe("el premio es de la materia del aula", ajenos, 0);
+
+  /*
+   * Todo item se dibuja: en el bolsillo, en la recompensa, y sobre todo en el
+   * umbral, donde aparece grande y solo. Un item sin ícono no se ve feo, rompe
+   * la pantalla — `Pixeles` lee `data[0].length` de un undefined.
+   */
+  debe(
+    "todo item tiene su ícono",
+    ITEM_IDS.filter((id) => !ICONOS_ITEM[id]).join(",") || "ninguno falta",
+    "ninguno falta",
+  );
   debe("premio de 0 no da nada", premioDe(rng, "biologia", 0).length, 0);
   debe("premio de 2 da dos", premioDe(rng, "biologia", 2).length, 2);
 

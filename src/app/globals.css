@@ -10,6 +10,7 @@
  *
  *   40  el estado que te agarra, a pantalla completa
  *   50  el destello rojo del golpe
+ *   55  el umbral: abrir la puerta y todavía no saber qué hay
  *   60  el grano
  *   70  la explicación que aparece al pasar por encima de una etiqueta
  *   80  el inventario, que tapa todo lo demás
@@ -219,6 +220,82 @@ body {
 }
 .marca {
   animation: marcar 1.3s ease-out forwards;
+}
+
+/*
+ * EL UMBRAL. Abrir una puerta no muestra el aula de golpe: la luz sube sola y
+ * lo que hay adentro toma forma después. El suspenso no está en lo que hay
+ * adentro sino en el rato en que todavía no sabés qué hay, así que las tres
+ * clases de aula se ven exactamente igual hasta el momento de revelar.
+ */
+@keyframes subir-luz {
+  from {
+    opacity: 0;
+    transform: scale(0.3);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+.luz-sube {
+  animation: subir-luz 1.5s cubic-bezier(0.35, 0, 0.2, 1) forwards;
+}
+
+/* Lo que estaba en la oscuridad tomando forma. */
+@keyframes revelarse {
+  0% {
+    opacity: 0;
+    transform: scale(1.14);
+    filter: blur(7px);
+  }
+  65% {
+    opacity: 1;
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+  }
+}
+.revela {
+  animation: revelarse 1.15s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+}
+
+/* Y lo que encontrás, subiendo con su propia luz. */
+@keyframes emerger {
+  0% {
+    opacity: 0;
+    transform: translateY(16px) scale(0.6);
+  }
+  55% {
+    opacity: 1;
+    transform: translateY(-4px) scale(1.12);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.emerge {
+  animation: emerger 0.95s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+}
+
+/* El halo de lo que encontraste, latiendo despacio. */
+@keyframes latir-halo {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.95);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.08);
+  }
+}
+.halo {
+  animation: latir-halo 2.4s ease-in-out infinite;
 }
 
 @keyframes sacudir {
