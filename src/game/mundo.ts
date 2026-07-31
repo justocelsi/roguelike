@@ -5,7 +5,7 @@
  * (no por casillas) con colisión AABB contra la grilla.
  */
 
-import { pick, pickMany, randInt, random, type Rng } from "./rng";
+import { pick, pickWeighted, randInt, type Rng } from "./rng";
 import { MATERIAS, MATERIA_IDS, PROFESORES } from "./content";
 
 export const TILE = 16;
@@ -22,14 +22,33 @@ export const PUERTA = 2;
  */
 export const SALA = 3;
 
+/** Lo que puede pasar al abrir una puerta. */
+export type Suceso = "pelea" | "bendicion" | "juego";
+
+/**
+ * Las puertas vienen en formas reconocibles. La idea es la misma que las salas
+ * icónicas: en la run número diez tenés que poder mirar una puerta y saber qué
+ * clase de puerta es, sin leer los números uno por uno.
+ */
+export const FORMAS_PUERTA = [
+  { id: "normal", peso: 5, reparto: { pelea: 70, bendicion: 20, juego: 10 } },
+  { id: "peligrosa", peso: 3, reparto: { pelea: 90, bendicion: 0, juego: 10 } },
+  { id: "tranquila", peso: 2, reparto: { pelea: 50, bendicion: 40, juego: 10 } },
+  { id: "rara", peso: 1, reparto: { pelea: 60, bendicion: 10, juego: 30 } },
+] as const;
+
 export type Puerta = {
   x: number;
   y: number;
   materiaId: string;
-  /** Lo que puede haber adentro, con su probabilidad. Se lee al acercarse. */
-  lecturas: { enemigoId: string; prob: number }[];
-  /** Lo que realmente hay. */
-  sorteado: string;
+  /** Qué clase de puerta es. Se aprende a reconocerla. */
+  forma: string;
+  /** Lo que puede pasar, con su probabilidad entera. Suman 100. */
+  lecturas: { suceso: Suceso; enemigoId?: string; prob: number }[];
+  /** Lo que realmente pasa. */
+  sorteado: Suceso;
+  /** Con qué enemigo, si toca pelea. */
+  enemigoId: string;
   usada: boolean;
   /** El rectángulo del aula que se ve detrás, en tiles. */
   sala: { x0: number; y0: number; x1: number; y1: number };
@@ -59,46 +78,53 @@ function armarLecturas(
   rng: Rng,
   materiaId: string,
   deformacion: number,
-): { lecturas: { enemigoId: string; prob: number }[]; sorteado: string } {
+): {
+  forma: string;
+  lecturas: Puerta["lecturas"];
+  sorteado: Suceso;
+  enemigoId: string;
+} {
   const propios = MATERIAS[materiaId].enemigos;
   // Deformación 1+: se cuelan enemigos de otras materias.
   const ajenos =
     deformacion >= 1
       ? [pick(rng, MATERIAS[pick(rng, MATERIA_IDS.filter((m) => m !== materiaId))].enemigos)]
       : [];
-  const pool = [...propios, ...ajenos];
+  const enemigoId = pick(rng, [...propios, ...ajenos]);
 
-  const elegidos = pickMany(rng, pool, Math.min(3, pool.length));
+  const forma = pickWeighted(
+    rng,
+    FORMAS_PUERTA.map((f) => ({ item: f, weight: f.peso })),
+  );
 
   /*
-   * Los porcentajes salen enteros y en múltiplos de 5, y suman 100 exacto.
-   * Antes eran pesos al azar normalizados a decimales y se mostraban
-   * redondeados, así que la puerta decía "37% 33% 31%" y encima no cerraba
-   * en 100. Un número redondo se compara de un vistazo; uno con coma hay
-   * que leerlo.
+   * Los porcentajes salen enteros y suman 100 exacto. Antes eran pesos al azar
+   * normalizados a decimales y se mostraban redondeados, así que una puerta
+   * decía "37% 33% 31%" y encima no cerraba en 100.
    */
-  const PASO = 5;
-  const bloques = 100 / PASO;
-  const reparto = elegidos.map(() => 1);
-  for (let i = elegidos.length; i < bloques; i++) {
-    reparto[randInt(rng, 0, elegidos.length - 1)]++;
+  const lecturas: Puerta["lecturas"] = [];
+  if (forma.reparto.pelea) {
+    lecturas.push({ suceso: "pelea", enemigoId, prob: forma.reparto.pelea });
   }
-  const lecturas = elegidos.map((enemigoId, i) => ({
-    enemigoId,
-    prob: reparto[i] * PASO,
-  }));
+  if (forma.reparto.bendicion) {
+    lecturas.push({ suceso: "bendicion", prob: forma.reparto.bendicion });
+  }
+  if (forma.reparto.juego) {
+    lecturas.push({ suceso: "juego", prob: forma.reparto.juego });
+  }
 
   // Se sortea contra los mismos números que ve el jugador.
   let roll = randInt(rng, 1, 100);
-  let sorteado = lecturas[lecturas.length - 1].enemigoId;
+  let sorteado: Suceso = lecturas[lecturas.length - 1].suceso;
   for (const l of lecturas) {
     roll -= l.prob;
     if (roll <= 0) {
-      sorteado = l.enemigoId;
+      sorteado = l.suceso;
       break;
     }
   }
-  return { lecturas, sorteado };
+
+  return { forma: forma.id, lecturas, sorteado, enemigoId };
 }
 
 /** Genera un tramo de pasillo con aulas a los costados y el profesor al fondo. */
@@ -144,12 +170,8 @@ export function generarPasillo(
     tiles[y * ancho + x] = PUERTA;
 
     const materiaId = pick(rng, MATERIA_IDS);
-    const { lecturas, sorteado } = armarLecturas(
-      rng,
-      materiaId,
-      deformacion[materiaId] ?? 0,
-    );
-    puertas.push({ x, y, materiaId, lecturas, sorteado, usada: false, sala });
+    const cont = armarLecturas(rng, materiaId, deformacion[materiaId] ?? 0);
+    puertas.push({ x, y, materiaId, ...cont, usada: false, sala });
   }
 
   // El aula del profesor: al fondo, ocupando todo el ancho que queda.
@@ -167,8 +189,10 @@ export function generarPasillo(
     x: xFinal,
     y: 6,
     materiaId: profesorId.replace("prof_", ""),
-    lecturas: [{ enemigoId: profesorId, prob: 1 }],
-    sorteado: profesorId,
+    forma: "profesor",
+    lecturas: [{ suceso: "pelea" as const, enemigoId: profesorId, prob: 100 }],
+    sorteado: "pelea" as const,
+    enemigoId: profesorId,
     usada: false,
     sala: salaProf,
     profesor: true,

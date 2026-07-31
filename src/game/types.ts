@@ -1,6 +1,7 @@
 /** Tipos del motor. Sin React, sin DOM: esto corre en cualquier lado. */
 
 import type { Mundo } from "./mundo";
+import type { Minijuego } from "./minijuegos";
 
 export type Efecto = "confusion" | "miedo" | "torpeza";
 
@@ -165,7 +166,14 @@ export type Combate = {
   sangria: { porTurno: number; robo: number } | null;
 };
 
-export type Fase = "pasillo" | "combate" | "recompensa" | "sueño" | "muerto" | "fin";
+export type Fase =
+  | "pasillo"
+  | "combate"
+  | "juego"
+  | "recompensa"
+  | "sueño"
+  | "muerto"
+  | "fin";
 
 export type Jugador = {
   /** Lo único que se restaura solo en cada aula. */
@@ -215,6 +223,10 @@ export type State = {
   /** El pasillo que estás caminando. */
   mundo: Mundo | null;
   combate: Combate | null;
+  /** El minijuego en curso, si detrás de la puerta había uno. */
+  minijuego: Minijuego | null;
+  /** La materia del aula en la que estás, para saber qué premio dar. */
+  materiaActual: string | null;
   efectos: EfectoActivo[];
 
   /** Nivel de deformación por materia: 0 limpia, 3 irreconocible. */
@@ -250,4 +262,6 @@ export type Action =
   | { type: "aceptar-oferta"; index: number }
   /** `dejar` null = descartar la que encontraste. */
   | { type: "canjear-arma"; dejar: string | null }
+  /** Una elección dentro de un minijuego. Significa distinto en cada uno. */
+  | { type: "juego"; eleccion: number }
   | { type: "reiniciar"; seed?: number };

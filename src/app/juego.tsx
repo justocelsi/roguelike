@@ -34,6 +34,7 @@ import {
   type Mundo,
   type Puerta,
 } from "@/game/mundo";
+import { preguntaDe, type Minijuego } from "@/game/minijuegos";
 import { DEFECTOS, PODERES } from "@/game/poderes";
 import {
   ICONOS,
@@ -115,7 +116,9 @@ export default function Juego() {
       */}
       <main
         className={`grano mx-auto flex w-full max-w-xl flex-col px-5 ${
-          state.fase === "combate" || state.fase === "recompensa"
+          state.fase === "combate" ||
+          state.fase === "recompensa" ||
+          state.fase === "juego"
             ? "h-dvh gap-3 overflow-hidden py-4"
             : "flex-1 gap-5 py-8"
         }`}
@@ -135,6 +138,9 @@ export default function Juego() {
             actual={actual}
             restantes={restantes}
           />
+        )}
+        {state.fase === "juego" && state.minijuego && (
+          <Juegito juego={state.minijuego} dispatch={dispatch} />
         )}
         {state.fase === "recompensa" && (
           <Recompensa state={state} dispatch={dispatch} contando={contando} />
@@ -514,7 +520,7 @@ function Pasillo({
                 <div className="flex items-baseline justify-between">
                   <span className={`text-sm font-bold ${cerca.profesor ? "text-malo" : "text-agua"}`}>
                     {cerca.profesor
-                      ? ENEMIGOS[cerca.sorteado].nombre
+                      ? ENEMIGOS[cerca.enemigoId].nombre
                       : nombreDe(state, cerca.materiaId)}
                   </span>
                   <span className="text-sm text-dim">[E] entrar</span>
@@ -522,11 +528,19 @@ function Pasillo({
                 {!cerca.profesor && (
                   <ul className="mt-1 flex flex-wrap gap-x-4">
                     {cerca.lecturas.map((l) => (
-                      <li key={l.enemigoId} className="text-sm text-dim">
+                      <li key={l.suceso} className="text-sm text-dim">
                         <span className="tabular-nums text-foreground">
                           {num(l.prob, c)}%
                         </span>{" "}
-                        {ENEMIGOS[l.enemigoId].nombre}
+                        {l.suceso === "pelea" ? (
+                          <span className="text-malo">
+                            pelea: {ENEMIGOS[l.enemigoId!].nombre}
+                          </span>
+                        ) : l.suceso === "bendicion" ? (
+                          <span className="text-salud">no hay nadie</span>
+                        ) : (
+                          <span className="text-oro">algo raro</span>
+                        )}
                       </li>
                     ))}
                   </ul>
@@ -1405,6 +1419,121 @@ function describirBotin(b: State["botin"][number]): {
         como: "Es permanente y se acumula con cada profesor que vencés.",
       };
   }
+}
+
+/**
+ * La pantalla de los minijuegos. Los tres comparten el marco y cambian sólo lo
+ * que hay para elegir: el pizarrón muestra y borra, la apuesta te deja seguir
+ * o irte, el examen pregunta.
+ */
+function Juegito({
+  juego,
+  dispatch,
+}: {
+  juego: Minijuego;
+  dispatch: (a: Action) => void;
+}) {
+  // La cuenta regresiva del pizarrón es cosa de la pantalla, no del motor.
+  const [mostrando, setMostrando] = useState(juego.tipo === "pizarron");
+  useEffect(() => {
+    if (juego.tipo !== "pizarron") return;
+    const t = setTimeout(() => setMostrando(false), 2600);
+    return () => clearTimeout(t);
+  }, [juego.tipo]);
+
+  const elegir = (i: number) => dispatch({ type: "juego", eleccion: i });
+
+  return (
+    <section className="flex min-h-0 flex-1 flex-col justify-center gap-6 border border-oro p-6">
+      <p className="text-sm tracking-[0.3em] text-oro">
+        {juego.tipo === "pizarron"
+          ? "EL PIZARRÓN"
+          : juego.tipo === "apuesta"
+            ? "LA CAJA"
+            : "LA HOJA"}
+      </p>
+      <p className="text-base leading-relaxed">{juego.cuento}</p>
+
+      {juego.tipo === "pizarron" && (
+        <div className="space-y-5">
+          {mostrando ? (
+            <>
+              <p className="text-sm tracking-widest text-dim">MIRALO BIEN</p>
+              <div className="flex justify-center gap-3">
+                {juego.secuencia!.map((sim, i) => (
+                  <Pixeles key={i} data={ICONOS[sim]} clase="w-10 text-agua" />
+                ))}
+              </div>
+            </>
+          ) : (
+            <>
+              <p className="text-sm tracking-widest text-dim">
+                ¿QUÉ DECÍA? — {juego.puestos!.length + 1} de {juego.secuencia!.length}
+              </p>
+              <div className="flex min-h-12 justify-center gap-3">
+                {juego.secuencia!.map((_, i) => (
+                  <div
+                    key={i}
+                    className={`flex h-10 w-10 items-center justify-center border ${
+                      juego.puestos![i] ? "border-agua" : "border-borde"
+                    }`}
+                  >
+                    {juego.puestos![i] && (
+                      <Pixeles data={ICONOS[juego.puestos![i]]} clase="w-6 text-agua" />
+                    )}
+                  </div>
+                ))}
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {juego.opcionesSimbolo!.map((sim, i) => (
+                  <button
+                    key={sim}
+                    onClick={() => elegir(i)}
+                    className="flex items-center justify-center border border-borde p-3 hover:border-oro hover:bg-oro/10"
+                  >
+                    <Pixeles data={ICONOS[sim]} clase="w-6 text-oro" />
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
+        </div>
+      )}
+
+      {juego.tipo === "apuesta" && (
+        <div className="space-y-4">
+          <p className="text-lg">
+            Llevás <span className="text-oro">{juego.juntado}</span>.
+          </p>
+          <p className="text-sm text-dim">
+            Si seguís, {juego.suerte}% de que entre otro y {100 - juego.suerte!}% de
+            perder todo lo junto.
+          </p>
+          <div className="grid grid-cols-2 gap-2">
+            <Boton label="SEGUIR" tono="text-oro" sub={`${juego.suerte}%`} onClick={() => elegir(1)} />
+            <Boton label="ME VOY" sub={`con ${juego.juntado}`} onClick={() => elegir(0)} />
+          </div>
+        </div>
+      )}
+
+      {juego.tipo === "examen" && (
+        <div className="space-y-4">
+          <p className="text-base">{preguntaDe(juego)}</p>
+          <div className="space-y-2">
+            {juego.opciones!.map((op, i) => (
+              <button
+                key={i}
+                onClick={() => elegir(i)}
+                className="block w-full border border-borde p-3 text-left text-base hover:border-oro hover:bg-oro/10"
+              >
+                {op}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
 }
 
 function Recompensa({

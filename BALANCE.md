@@ -27,7 +27,7 @@ aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 | `DAÑO_CONTRA` | **5** | `engine.ts` | Lo que devuelve un bloqueo que salió |
 | `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
 | `PASA_BLOQUEANDO` | **0** | `engine.ts` | Un bloqueo que sale no deja pasar nada |
-| `MULT_ENEMIGO` | **1.40** | `engine.ts` | Perilla global del daño enemigo |
+| `MULT_ENEMIGO` | **1.35** | `engine.ts` | Perilla global del daño enemigo |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.92** | `engine.ts` | Puntería del golpe a mano limpia |
 | `FALLA_POR_MIEDO` | **0.30** | `engine.ts` | Chance de que una acción no salga con miedo |
@@ -37,6 +37,7 @@ aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 | `VIDA_BASE` | **45** | `engine.ts` | Vida inicial |
 | `CICLOS` | **5** | `engine.ts` | Duración de una run |
 | `AULAS` por pasillo | **5** | `mundo.ts` | Aulas antes del profesor |
+| `FORMAS_PUERTA` | 4 formas | `mundo.ts` | Qué puede haber detrás de cada puerta |
 | `perdida` de la pelota | **0.05** | `content.ts` | Chance de perderla por rebote |
 
 Varias son ajustables por entorno para simular sin editar código:
@@ -54,18 +55,21 @@ distintas de jugar caigan en una banda parecida**, y que las degeneradas
 
 ### Medición actual
 
+2000 corridas por estilo, con las puertas repartiendo peleas, bendiciones y
+minijuegos.
+
 | Estilo | Muertes | Ciclo |
 |---|---|---|
-| Calculador: decide turno a turno | **48,8%** | 3,6 |
-| Guarda los items para el profesor | 51,9% | 3,5 |
-| Media pasada del pasillo | 56,0% | 3,3 |
-| Pasivo: bloquea siempre que sirve | 56,9% | 3,3 |
-| Luchador: nunca bloquea | 60,3% | 2,9 |
-| A lo bruto: el arma que más pegue | 60,9% | 2,9 |
-| **Derecho al profesor** | **95,6%** | 1,9 |
+| Calculador: decide turno a turno | **48,1%** | 3,6 |
+| Guarda los items para el profesor | 51,9% | 3,4 |
+| Pasivo: bloquea siempre que sirve | 54,3% | 3,4 |
+| Media pasada del pasillo | 58,5% | 3,1 |
+| Luchador: nunca bloquea | 61,1% | 2,8 |
+| A lo bruto: el arma que más pegue | 61,8% | 2,7 |
+| **Derecho al profesor** | **94,6%** | 1,9 |
 
-Seis estilos entre 49% y 61%, y el que piensa turno a turno gana por 3 puntos
-sobre el segundo. Saltearse el pasillo sigue siendo un error de 35 puntos.
+Seis estilos entre 48% y 62%, y el que piensa turno a turno gana por 4 puntos
+sobre el segundo. Saltearse el pasillo sigue siendo un error de 33 puntos.
 
 ---
 
@@ -324,6 +328,89 @@ Tres niveles con peso de aparición 6 / 3 / 1:
 Los dos únicos son justamente los de forma nueva —el escudo y la sangría—, así
 que encontrarlos cambia cómo jugás esa run.
 
+### Las puertas dejaron de ser todas peleas
+
+Antes toda puerta era un combate y el porcentaje que mostraba era sólo *contra
+qué*. Ahora reparte entre tres cosas, con **porcentajes enteros que suman 100**
+porque un "37% 33% 31%" que no cierra es una promesa que el jugador no puede
+usar para decidir.
+
+| Puerta | Peso | Pelea | No hay nadie | Minijuego |
+|---|---|---|---|---|
+| Normal | 5 | 70% | 20% | 10% |
+| Peligrosa | 3 | 90% | — | 10% |
+| Tranquila | 2 | 50% | 40% | 10% |
+| Rara | 1 | 60% | 10% | 30% |
+
+Ponderado, **el 70% de las aulas siguen siendo peleas**, que era el pedido: el
+juego es pelear, y lo demás premia mirar los números antes de entrar.
+
+**Costo medido.** Con un 30% de aulas sin combate se junta menos equipo, así
+que el mismo `MULT_ENEMIGO = 1.40` dejaba a la mitad de los estilos arriba del
+60%:
+
+| `MULT_ENEMIGO` | Banda de los seis estilos |
+|---|---|
+| 1.30 | 45,1% – 57,8% |
+| **1.35** | **48,0% – 61,1%** |
+| 1.40 | 51,7% – 62,9% |
+
+Quedó en **1.35**, que es el que deja más estilos dentro de 50-60 y mantiene la
+media pasada compitiendo con la pasada completa.
+
+### El bug que hacía mentir a todo el banco de pruebas
+
+La primera medición con puertas repartidas dio muertes del 19% al 41% y ciclo
+promedio 1,5. Parecía que el juego se había vuelto trivial.
+
+No se había vuelto trivial: **el bot de estilos no sabía qué mandar en la fase
+del minijuego**, salía del bucle, y esa partida entraba al promedio como si
+hubiera terminado bien. **1581 de 5600 runs se cortaban en el ciclo 1** y
+contaban como sobrevividas.
+
+El parche que agregaba el minijuego al bot había entrado en el bot de
+invariantes y no en el de estilos — la misma clase de error que ya había
+desconectado en silencio la lata y el segundo aire.
+
+**Lo que quedó, para que no vuelva a pasar.** Una partida sana termina en
+`muerto` o en `fin`. Cualquier otra cosa se cuenta, se imprime con el motivo, y
+devuelve código de salida 1. Los números de arriba ya no pueden mentir sin
+avisar.
+
+### La bendición no daba nada
+
+El aula vacía armaba el botín para mostrarlo en pantalla y **nunca lo guardaba
+en el bolsillo**: decía "no hay nadie, encontrás algo" y no encontrabas nada.
+
+Se agregó la invariante *el botín que se muestra es el que se guarda* — mira el
+bolsillo antes y después en vez de leer el código. Verificada rompiendo el
+arreglo a propósito: **593 fallas** con el bug puesto, cero sin él.
+
+Y el premio pasó a ponderarse por rareza como el botín de combate: repartía
+uniforme, así que una bendición gratis soltaba únicos tan seguido como tizas.
+La bendición además da **sólo comunes**, porque no cuesta nada.
+
+### Los tres minijuegos
+
+Cada uno prueba algo distinto para que caer en uno no se sienta siempre igual:
+
+| Juego | Qué prueba | Paga |
+|---|---|---|
+| **El pizarrón** | Memoria: 4 símbolos que se muestran y se borran | 4/4 → 2 items · 3/4 → 1 · menos → 0 |
+| **La apuesta** | Nervio: seguís o te vas con lo junto | Lo que juntaste, o nada si se cae |
+| **El examen** | Atención: qué anuncia un enemigo que venciste | Acertar → 2 items |
+
+La apuesta arranca en 1 juntado con 70% de suerte, y **cada paso que sale bien
+baja la suerte 15 puntos** con piso en 25. Seguir siempre no conviene: el valor
+esperado deja de subir cuando la suerte cae por debajo de `n / (n+1)`.
+
+El examen sólo aparece con **3 sombras o más**, porque preguntar por algo que
+todavía no viste no es una prueba de atención sino una moneda.
+
+**34 comprobaciones de números exactos** cubren los tres juegos y el reparto de
+las puertas. Exactos y no "algo cambió": ese es el único tipo de test que
+agarró los parches que no se aplicaron.
+
 ## Cómo volver atrás
 
 Cada bloque de arriba tiene los valores viejos. Para recuperar un estado:
@@ -339,3 +426,9 @@ Cada bloque de arriba tiene los valores viejos. Para recuperar un estado:
   seguro, la devolución tiene que bajar.
 - `EV` > `ED`. Si el daño escala más rápido que la vida, el ciclo 5 mata de dos
   golpes y las peleas dejan de leerse.
+- Peso de las peleas en `FORMAS_PUERTA` ↔ `MULT_ENEMIGO`. Menos peleas es menos
+  equipo: si baja el porcentaje de combate, hay que bajar el daño enemigo.
+
+**Antes de creerle a una medición:** que no haya runs cortadas. El banco las
+imprime y devuelve error; si aparecen, los porcentajes de arriba no significan
+nada.

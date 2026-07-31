@@ -20,6 +20,12 @@ import {
   nombreMateria,
 } from "./content";
 import { generarPasillo, type Mundo } from "./mundo";
+import {
+  armarMinijuego,
+  jugar,
+  premioDe,
+  type Minijuego,
+} from "./minijuegos";
 import { DEFECTOS, DEFECTO_IDS, PODERES, PODER_IDS } from "./poderes";
 import {
   makeRng,
@@ -69,8 +75,14 @@ export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 5);
  * imparables y que bloquear no hace daño.
  */
 export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0);
-/** Perilla global del daño enemigo. Se afina midiendo, no a ojo. */
-const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.4);
+/**
+ * Perilla global del daño enemigo. Se afina midiendo, no a ojo.
+ *
+ * Bajó de 1,4 a 1,35 cuando las puertas dejaron de ser todas peleas: con un 30%
+ * de aulas sin combate se junta menos equipo, así que el mismo multiplicador
+ * dejaba a la mitad de los estilos arriba del 60% de muertes.
+ */
+const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.35);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -645,6 +657,8 @@ export function initialState(seed: number = randomSeed()): State {
     jugador,
     mundo: null,
     combate: null,
+    minijuego: null,
+    materiaActual: null,
     efectos: [],
     deformacion: Object.fromEntries(MATERIA_IDS.map((m) => [m, 0])),
     cicloTerminado: false,
@@ -676,7 +690,7 @@ function apply(state: State, action: Action, rng: Rng): State {
         (p) => p.x === action.puertaX && p.y === action.puertaY,
       );
       if (!puerta || puerta.usada) return state;
-      const enemigo = ENEMIGOS[puerta.sorteado];
+      const enemigo = ENEMIGOS[puerta.enemigoId];
       const vidaEnemigo = Math.round(enemigo.vida * escalaVida(state));
 
       const mundo: Mundo = {
@@ -686,10 +700,53 @@ function apply(state: State, action: Action, rng: Rng): State {
         ),
       };
 
+      // Una bendición no cuesta nada y por eso da menos: un solo item común.
+      if (puerta.sorteado === "bendicion") {
+        const itemId = premioDe(rng, puerta.materiaId, 1, true)[0];
+        const cabe = state.jugador.items.length < 6 && !!itemId;
+        return {
+          ...state,
+          fase: "recompensa",
+          mundo,
+          materiaActual: puerta.materiaId,
+          caido: null,
+          cicloTerminado: false,
+          // El botín es lo que se muestra; si no se guarda acá, no se guarda.
+          jugador: cabe
+            ? { ...state.jugador, items: [...state.jugador.items, itemId] }
+            : state.jugador,
+          botin: cabe ? [{ tipo: "item", id: itemId, cantidad: 1 }] : [],
+          log: log(
+            state.log,
+            cabe
+              ? `${nombreDe(state, puerta.materiaId)}. No hay nadie. Encontrás algo.`
+              : `${nombreDe(state, puerta.materiaId)}. No hay nadie, y no te entra nada más.`,
+            "bueno",
+          ),
+        };
+      }
+
+      if (puerta.sorteado === "juego") {
+        const mini = armarMinijuego(rng, state.jugador.sombras);
+        return {
+          ...state,
+          fase: "juego",
+          mundo,
+          minijuego: mini,
+          materiaActual: puerta.materiaId,
+          log: log(
+            state.log,
+            `${nombreDe(state, puerta.materiaId)}. No hay nadie. ${mini.cuento}`,
+            "neutral",
+          ),
+        };
+      }
+
       return {
         ...state,
         fase: "combate",
         mundo,
+        materiaActual: puerta.materiaId,
         efectos: [],
         // Entrás entero: cada combate es un desafío letal autocontenido, no
         // una carrera de desgaste por el pasillo.
@@ -724,6 +781,27 @@ function apply(state: State, action: Action, rng: Rng): State {
           "eso",
           { aviso: true },
         ),
+      };
+    }
+
+    case "juego": {
+      if (state.fase !== "juego" || !state.minijuego) return state;
+      const j = jugar(state.minijuego, action.eleccion, rng);
+      if (!j.terminado) {
+        return { ...state, minijuego: j, log: log(state.log, j.cuento) };
+      }
+      // Terminado: el premio sale de la materia del aula, como cualquier botín.
+      const gana = premioDe(rng, state.materiaActual ?? "", j.premio);
+      const caben = gana.slice(0, Math.max(0, 6 - state.jugador.items.length));
+      return {
+        ...state,
+        fase: "recompensa",
+        minijuego: null,
+        caido: null,
+        cicloTerminado: false,
+        jugador: { ...state.jugador, items: [...state.jugador.items, ...caben] },
+        botin: agruparBotin(caben),
+        log: log(state.log, j.cuento, j.premio > 0 ? "bueno" : "malo"),
       };
     }
 
@@ -789,6 +867,17 @@ function apply(state: State, action: Action, rng: Rng): State {
     default:
       return state;
   }
+}
+
+/** Junta repetidos para listarlos con su cantidad. */
+function agruparBotin(ids: string[]): State["botin"] {
+  const m = new Map<string, number>();
+  for (const id of ids) m.set(id, (m.get(id) ?? 0) + 1);
+  return [...m.entries()].map(([id, cantidad]) => ({
+    tipo: "item" as const,
+    id,
+    cantidad,
+  }));
 }
 
 function volverAlPasillo(state: State, rng: Rng, forzarSueño: boolean): State {

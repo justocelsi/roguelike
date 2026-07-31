@@ -32,7 +32,8 @@ casi hermoso. Lo que da miedo no es dormirse: es despertarse.
 1. **Caminás el pasillo.** Movimiento libre en 2D, WASD o flechas.
 2. **Las puertas se leen al acercarte**: la materia y los porcentajes de qué
    puede haber adentro.
-3. **Entrás a un aula** y hay un combate por turnos. Ganás un arma o un item.
+3. **Entrás a un aula.** Casi siempre hay un combate por turnos; a veces no hay
+   nadie, y a veces hay un minijuego. Ganás un arma o un item.
 4. **Al fondo del pasillo está el profesor.** Siempre está abierto: podés ir
    derecho o limpiar aulas antes para juntar equipo. Esa es la decisión.
 5. **Vencido el profesor, dormís.** En el sueño te ofrecen tres pares de
@@ -58,8 +59,44 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 11 invariantes automáticas. El banco de pruebas vive en
-`scripts/balance.ts`.
+Verificado con 12 invariantes automáticas y 34 comprobaciones de números
+exactos. El banco de pruebas vive en `scripts/balance.ts`.
+
+## Qué hay detrás de una puerta
+
+Lo único incierto es lo que pasa **antes** de entrar. Adentro no se esconde
+nada: los porcentajes están escritos en la puerta, son **enteros y suman 100**,
+y son exactamente los números contra los que se sortea. Un "37% 33% 31%" que no
+cierra no le sirve a nadie para decidir.
+
+Las puertas vienen en **cuatro formas reconocibles**, la misma idea que las
+salas icónicas: en la run número diez tenés que poder mirar una puerta y saber
+qué clase de puerta es sin leer los números uno por uno.
+
+| Puerta | Pelea | No hay nadie | Minijuego |
+|---|---|---|---|
+| Normal | 70% | 20% | 10% |
+| Peligrosa | 90% | — | 10% |
+| Tranquila | 50% | 40% | 10% |
+| Rara | 60% | 10% | 30% |
+
+Ponderado por lo seguido que aparece cada una, **el 70% de las aulas son
+peleas**. El juego es pelear; lo demás está para que mirar los números antes de
+entrar sea una decisión y no un trámite.
+
+- **No hay nadie.** Un item común, sin riesgo. Sale gratis, así que da lo básico.
+- **Minijuego.** Tres, y cada uno prueba algo distinto para que caer en uno no
+  se sienta siempre igual:
+
+| Juego | Qué te pide | Paga |
+|---|---|---|
+| **El pizarrón** | Acordarte de cuatro símbolos que se borraron | 4/4 → 2 items · 3/4 → 1 |
+| **La apuesta** | Saber cuándo irte: cada paso que sale bien vuelve el próximo más difícil | Lo que juntaste, o nada |
+| **El examen** | Qué anuncia un enemigo que ya venciste | Acertar → 2 items |
+
+El examen sólo aparece cuando ya venciste al menos tres cosas: preguntarte por
+algo que no viste no es atención, es una moneda. Y es el único lugar donde
+prestarle atención a los avisos del combate te paga fuera del combate.
 
 ### Salas icónicas
 
@@ -249,13 +286,15 @@ sobreviven en una banda parecida**:
 
 | Estilo | Muertes |
 |---|---|
-| Limpia todo, guarda los items para el profesor | 44,0% |
-| Limpia todo a lo bruto, el arma que más pegue | 45,1% |
-| Limpia la mitad del pasillo | 46,3% |
-| Limpia todo, quema items apenas baja la vida | 49,2% |
-| Va derecho al profesor | 65,9% |
+| Decide turno a turno | 48,1% |
+| Guarda los items para el profesor | 51,9% |
+| Bloquea siempre que sirve | 54,3% |
+| Limpia la mitad del pasillo | 58,5% |
+| Nunca bloquea | 61,1% |
+| A lo bruto, el arma que más pegue | 61,8% |
+| Va derecho al profesor | 94,6% |
 
-Cuatro estilos distintos caen entre 44% y 49%. El único claramente peor es
+Seis estilos distintos caen entre 48% y 62%. El único claramente peor es
 saltearse el pasillo entero, que es lo correcto: renunciar a todo el equipo
 tiene que costar. Y *cuánto* explorar sigue abierto — media pasada compite con
 la pasada completa.
@@ -274,6 +313,8 @@ convenía.
 - **Progresión entre runs**: no se desbloquea nada todavía.
 - **Las sombras están flojas**: sólo limpian efectos.
 - Cosas para encontrar caminando el pasillo, más allá de las puertas.
+- **Los minijuegos no usan lo que llevás encima.** Son tres pruebas cerradas;
+  ninguna cambia según tu equipo, tus poderes o tus defectos.
 
 ## Sin decidir
 
