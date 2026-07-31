@@ -29,12 +29,23 @@ export type Suceso = "pelea" | "bendicion" | "juego";
  * Las puertas vienen en formas reconocibles. La idea es la misma que las salas
  * icónicas: en la run número diez tenés que poder mirar una puerta y saber qué
  * clase de puerta es, sin leer los números uno por uno.
+ *
+ * **Todos los porcentajes son múltiplos de 10.** No es cosmético: un riesgo que
+ * se puede pensar en décimos se calcula de cabeza mientras caminás el pasillo, y
+ * uno que dice 37% obliga a leer el número entero para no entender nada mejor.
+ *
+ * La única excepción es *la incierta*, que reparte parejo entre las tres cosas.
+ * Se lee igual de rápido —"acá puede pasar cualquiera"— y es el único lugar
+ * donde no hay nada más probable que otra cosa.
  */
 export const FORMAS_PUERTA = [
   { id: "normal", peso: 5, reparto: { pelea: 70, bendicion: 20, juego: 10 } },
   { id: "peligrosa", peso: 3, reparto: { pelea: 90, bendicion: 0, juego: 10 } },
   { id: "tranquila", peso: 2, reparto: { pelea: 50, bendicion: 40, juego: 10 } },
   { id: "rara", peso: 1, reparto: { pelea: 60, bendicion: 10, juego: 30 } },
+  // El 34 va a la pelea porque es lo que el juego es; los tres se muestran
+  // como un tercio cada uno, que es lo que el jugador necesita saber.
+  { id: "incierta", peso: 1, reparto: { pelea: 34, bendicion: 33, juego: 33 } },
 ] as const;
 
 export type Puerta = {

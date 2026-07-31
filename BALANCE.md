@@ -27,7 +27,7 @@ aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 | `DAÑO_CONTRA` | **5** | `engine.ts` | Lo que devuelve un bloqueo que salió |
 | `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
 | `PASA_BLOQUEANDO` | **0** | `engine.ts` | Un bloqueo que sale no deja pasar nada |
-| `MULT_ENEMIGO` | **1.35** | `engine.ts` | Perilla global del daño enemigo |
+| `MULT_ENEMIGO` | **1.65** | `engine.ts` | Perilla global del daño enemigo |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.92** | `engine.ts` | Puntería del golpe a mano limpia |
 | `FALLA_POR_MIEDO` | **0.30** | `engine.ts` | Chance de que una acción no salga con miedo |
@@ -60,16 +60,16 @@ minijuegos.
 
 | Estilo | Muertes | Ciclo |
 |---|---|---|
-| Calculador: decide turno a turno | **48,1%** | 3,6 |
-| Guarda los items para el profesor | 51,9% | 3,4 |
-| Pasivo: bloquea siempre que sirve | 54,3% | 3,4 |
-| Media pasada del pasillo | 58,5% | 3,1 |
-| Luchador: nunca bloquea | 61,1% | 2,8 |
-| A lo bruto: el arma que más pegue | 61,8% | 2,7 |
-| **Derecho al profesor** | **94,6%** | 1,9 |
+| Guarda los items para el profesor | **52,1%** | 3,2 |
+| Calculador: decide turno a turno | 52,3% | 3,2 |
+| Pasivo: bloquea siempre que sirve | 55,6% | 3,0 |
+| Media pasada del pasillo | 60,8% | 2,9 |
+| A lo bruto: el arma que más pegue | 60,8% | 2,7 |
+| Luchador: nunca bloquea | 61,4% | 2,7 |
+| **Derecho al profesor** | **86,2%** | 2,0 |
 
-Seis estilos entre 48% y 62%, y el que piensa turno a turno gana por 4 puntos
-sobre el segundo. Saltearse el pasillo sigue siendo un error de 33 puntos.
+Seis estilos dentro de 9 puntos, todos en la banda. Saltearse el pasillo sigue
+siendo un error de 25 puntos.
 
 ---
 
@@ -411,6 +411,107 @@ todavía no viste no es una prueba de atención sino una moneda.
 las puertas. Exactos y no "algo cambió": ese es el único tipo de test que
 agarró los parches que no se aplicaron.
 
+### Cuatro cosas que el combate resolvía sin mostrar
+
+Reportado jugando: *"morí sin ver las acciones del enemigo ser ejecutadas,
+simplemente hizo el cálculo y perdí"*. Buscando alrededor aparecieron cuatro
+del mismo tipo — el motor hacía lo correcto y la pantalla no lo contaba, o lo
+contaba distinto de como lo hacía.
+
+**1. La muerte se comía el turno del enemigo.** El motor pasa a `muerto` en el
+mismo despacho en que resuelve el turno, así que la interfaz desmontaba el aula
+con toda la mano encolada. Hacías tu acción y lo siguiente que veías era la
+pantalla del final: lo que el enemigo decidió, lo que ejecutó y cuánto te sacó
+no llegaban a existir. Lo mismo pasaba al ganar y al huir.
+
+Ahora el aula no se abandona hasta que la secuencia terminó. Se guarda el último
+estado en combate y se lo sigue mostrando; como durante la secuencia los botones
+ya estaban bloqueados, no se pierde ninguna interacción. Y morir tiene su propia
+línea —*"Se te apaga todo"*— para que la secuencia termine en algo legible en
+vez de cortarse.
+
+Había además un hueco de un frame: la cola de eventos se arma en un efecto, o
+sea después de pintar, así que en el render en que llega el log nuevo todavía
+estaba vacía. Ese frame alcanzaba para irse de la pantalla.
+
+**2. Un bloqueo que salía dejaba pasar 1 de daño.** `Math.max(1, daño × 0)` da
+1, no 0. La pantalla decía "lo bloqueás" y la barra bajaba igual, mientras que
+bloquear un estado no te tocaba nada. Ahora para el golpe entero de verdad.
+
+**3. Los anteojos se gastaban en golpes que ya habías parado.** El escudo se
+resolvía antes que el bloqueo, así que un bloqueo que salía bien igual te
+consumía el único. Ahora el bloqueo va primero y los anteojos sólo se gastan si
+queda daño por comer.
+
+**4. Un enemigo muerto seguía moviéndose.** El contraataque del bloqueo puede
+ser el golpe final, pero la torpeza le daba un segundo turno igual: lo matabas y
+te comías un golpe suyo después. **133 casos sobre 1200 partidas.** La lata
+hacía algo parecido: te cobraba su parte en el turno en que ganaste, y podía
+matarte en una pelea que ya había terminado.
+
+Las cuatro quedaron como invariantes, y las cuatro se verificaron rompiendo el
+arreglo a propósito para confirmar que la prueba no era vacía.
+
+### USAR es una sola regla, o no es ninguna
+
+El diseño decía desde siempre que USAR no gasta el turno. En el código valía
+sólo para los items: **la sombra —cuya única función es sacarte los estados de
+encima— te cobraba el turno del enemigo**, o sea que limpiarte la confusión te
+costaba un golpe. Los poderes, igual.
+
+Los tres salen del mismo menú y se ven igual, así que la excepción no se aprende
+como una regla sino como una trampa.
+
+Aparte, el chequeo del miedo corría **antes** de mirar qué acción era, así que
+un USAR que fallaba por miedo también regalaba el turno. Y peor: la pantalla ya
+mostraba `precisión × miedo` como un solo número, pero el motor lo resolvía con
+dos tiradas de consecuencias distintas —fallar por miedo no gastaba el item y
+costaba el turno; fallar por precisión gastaba el item y no costaba el turno—.
+Ahora el miedo entra dentro de la tirada propia de cada cosa: un número, un
+resultado.
+
+**Nota para medir:** los bots nunca usaban poderes de daño ni sombras. Con USAR
+gratis, un jugador que mira la pantalla vacía el cargador antes de pegar —los
+usos vuelven en la próxima pelea, guardarlos no compra nada—. Sin corregir eso
+la medición habría dado un buff mucho más chico que el real.
+
+### Lo que costaron los arreglos
+
+| | Banda de los seis estilos | Derecho al profesor |
+|---|---|---|
+| Antes | 49,4% – 60,3% | 94,8% |
+| Con los arreglos, `MULT 1.35` | 33,7% – 51,0% | 82,3% |
+| Con devolución también contra estados | **20,0% – 52,5%** | 61,4% |
+| **Final, `MULT 1.65`** | **52,1% – 61,4%** | 86,2% |
+
+La fila del medio es la que se descartó. Hacer que bloquear devolviera daño
+también contra los estados era más "consistente" en un sentido barato —una
+tirada, un resultado— pero volvía a poner a cubrirse como la respuesta a todos
+los turnos: 22% para el pasivo contra 51% del que nunca bloquea. La regla que
+quedó se dice igual de rápido y no rompe nada: **te protege de todo, pero sólo
+devolvés lo que te tiraron.**
+
+El resto de los arreglos le devolvió al jugador unos 15 puntos, y el daño
+enemigo subió de **1,35 a 1,65** para compensarlos:
+
+| `MULT_ENEMIGO` | Banda | Derecho al profesor |
+|---|---|---|
+| 1.45 | 38,5% – 54,4% | 84,3% |
+| 1.55 | 40,8% – 58,6% | 85,0% |
+| **1.65** | **48,9% – 62,6%** | 88,3% |
+
+### Los porcentajes van de a 10
+
+Pedido jugando: *"que sean múltiplos de 10, salvo en el caso de una sala con 33%
+para cada posibilidad, así se simplifica el riesgo a tomar"*.
+
+Un riesgo en décimos se calcula de cabeza caminando el pasillo. La excepción es
+*la incierta* —34/33/33— que se lee igual de rápido porque lo que dice no es un
+número sino "acá puede pasar cualquiera": es la única puerta donde nada es más
+probable que otra cosa.
+
+Con la incierta en el reparto, las peleas ponderadas bajan de 70% a **68%**.
+
 ## Cómo volver atrás
 
 Cada bloque de arriba tiene los valores viejos. Para recuperar un estado:
@@ -428,6 +529,10 @@ Cada bloque de arriba tiene los valores viejos. Para recuperar un estado:
   golpes y las peleas dejan de leerse.
 - Peso de las peleas en `FORMAS_PUERTA` ↔ `MULT_ENEMIGO`. Menos peleas es menos
   equipo: si baja el porcentaje de combate, hay que bajar el daño enemigo.
+- Bloquear **no devuelve daño contra los estados**. Si vuelve a devolver,
+  cubrirse pasa a ser la respuesta a todos los turnos y el pasivo se va a 22%.
+- USAR no gasta el turno para **ninguna** de las tres cosas del menú. Una sola
+  excepción y la regla deja de poder aprenderse.
 
 **Antes de creerle a una medición:** que no haya runs cortadas. El banco las
 imprime y devuelve error; si aparecen, los porcentajes de arriba no significan

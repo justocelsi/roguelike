@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 12 invariantes automáticas y 34 comprobaciones de números
+Verificado con 16 invariantes automáticas y 42 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Qué hay detrás de una puerta
@@ -79,8 +79,15 @@ qué clase de puerta es sin leer los números uno por uno.
 | Peligrosa | 90% | — | 10% |
 | Tranquila | 50% | 40% | 10% |
 | Rara | 60% | 10% | 30% |
+| Incierta | 34% | 33% | 33% |
 
-Ponderado por lo seguido que aparece cada una, **el 70% de las aulas son
+**Todos los porcentajes son múltiplos de 10.** No es cosmético: un riesgo que se
+piensa en décimos se calcula de cabeza mientras caminás, y uno que dice 37%
+obliga a leer el número entero para no entender nada mejor. La única excepción
+es *la incierta*, que reparte parejo — y que se lee igual de rápido, porque lo
+que dice es "acá puede pasar cualquiera".
+
+Ponderado por lo seguido que aparece cada una, **el 68% de las aulas son
 peleas**. El juego es pelear; lo demás está para que mirar los números antes de
 entrar sea una decisión y no un trámite.
 
@@ -147,10 +154,17 @@ más" sino "qué corresponde ahora".
 | Acción | Qué hace |
 |---|---|
 | **ATACAR** | 6 de daño. A mano limpia no le hacés gran cosa a esto |
-| **BLOQUEAR** | 90% de que salga. Si sale, **para el golpe entero y también los estados**, y le devolvés 5 |
+| **BLOQUEAR** | 90% de que salga. Si sale, **no te toca nada** — ni el golpe ni el estado |
 | **ARMA** | Daño alto y usos contados **por pelea**. Es lo que hacés en los turnos en que no te cubrís |
-| **USAR** | Item, sombra o poder. **No gasta el turno** |
+| **USAR** | Item, sombra o poder. **Ninguno de los tres gasta el turno** |
 | **HUIR** | Salís al pasillo. Contra un profesor la puerta no abre |
+
+**Bloquear te protege de todo, pero sólo devolvés lo que te tiraron.** Contra un
+golpe le devolvés 5; contra algo que te quería dejar un estado encima, no hay
+golpe que redirigir y no devolvés nada. Es una regla que se dice en una línea, y
+es lo que impide que cubrirse sea la respuesta a todos los turnos: medido con
+devolución también contra los estados, el estilo pasivo se iba a 22% de muertes
+contra 51% del que nunca bloquea.
 
 El puño es débil a propósito, y esa es la pieza que sostiene el pasillo: sin
 arma, los turnos en que no te cubrís no valen nada.
@@ -160,9 +174,22 @@ razón para atacar cuando ves venir un golpe. Lo que impide que bloquear sea la
 respuesta a todo son dos reglas: hay **golpes imparables** que lo atraviesan, y
 bloquear casi no hace daño — sobrevivís, pero no avanzás.
 
-**Los consumibles no gastan el turno.** Usar un item no cuesta tiempo, cuesta
-el item: la pregunta deja de ser "¿vale la pena perder un turno?" y pasa a ser
-"¿lo quemo ahora o lo guardo para el profesor?".
+**Nada de lo que sale por USAR gasta el turno.** Ni el item, ni la sombra, ni el
+poder: usar algo no cuesta tiempo, cuesta el recurso. La pregunta deja de ser
+"¿vale la pena perder un turno?" y pasa a ser "¿lo quemo ahora o lo guardo para
+el profesor?".
+
+Que valga para los tres es la mitad del punto. Los tres salen del mismo menú y
+se ven igual, así que una excepción no se aprende como una regla sino como una
+trampa: sacarte la confusión de encima con una sombra te cobraba el turno del
+enemigo, o sea que limpiarte te costaba un golpe. Por lo mismo el **miedo** no
+puede quedarte duro en un USAR — ahí se cobra adentro de la tirada propia de
+cada cosa, que es el número que la pantalla ya venía mostrando.
+
+**Nada se resuelve fuera de pantalla.** Morir es un evento como cualquier otro:
+tenés que ver al enemigo decidir, ejecutar y sacarte lo que te saca, y recién
+después la pantalla del final. El aula no se cierra hasta que la secuencia
+terminó de contarse.
 
 **Cada profesor vencido suma +40% de daño a todo lo que hacés.** Sin eso los
 enemigos escalan por ciclo y tus números se quedan atrás: sin progresión, todos
@@ -286,18 +313,18 @@ sobreviven en una banda parecida**:
 
 | Estilo | Muertes |
 |---|---|
-| Decide turno a turno | 48,1% |
-| Guarda los items para el profesor | 51,9% |
-| Bloquea siempre que sirve | 54,3% |
-| Limpia la mitad del pasillo | 58,5% |
-| Nunca bloquea | 61,1% |
-| A lo bruto, el arma que más pegue | 61,8% |
-| Va derecho al profesor | 94,6% |
+| Guarda los items para el profesor | 52,1% |
+| Decide turno a turno | 52,3% |
+| Bloquea siempre que sirve | 55,6% |
+| Limpia la mitad del pasillo | 60,8% |
+| A lo bruto, el arma que más pegue | 60,8% |
+| Nunca bloquea | 61,4% |
+| Va derecho al profesor | 86,2% |
 
-Seis estilos distintos caen entre 48% y 62%. El único claramente peor es
-saltearse el pasillo entero, que es lo correcto: renunciar a todo el equipo
-tiene que costar. Y *cuánto* explorar sigue abierto — media pasada compite con
-la pasada completa.
+Seis estilos distintos caen dentro de 9 puntos, entre 52% y 61%. El único
+claramente peor es saltearse el pasillo entero, que es lo correcto: renunciar a
+todo el equipo tiene que costar. Y *cuánto* explorar sigue abierto — media
+pasada compite con la pasada completa.
 
 Que esto funcione depende de un número: **el ataque a mano limpia hace 6**. La
 primera vez que se midió, con el puño en 12, la relación estaba invertida y

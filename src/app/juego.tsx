@@ -65,6 +65,26 @@ export default function Juego() {
   // La secuencia también vive acá: el golpe que mata cambia de pantalla, y
   // esas líneas tienen que terminar de verse igual.
   const { actual, contando, restantes } = useSecuencia(state?.log ?? SIN_LOG);
+  /*
+   * El aula no se abandona en medio de una secuencia.
+   *
+   * El motor pasa a "muerto" o a "recompensa" en el mismo despacho en que
+   * resuelve el turno, así que la pantalla del combate se desmontaba con toda
+   * la mano todavía encolada: hacías tu acción, y lo siguiente que veías era la
+   * pantalla de muerte. El turno del enemigo —lo que decidió, lo que ejecutó y
+   * cuánto te sacó— no llegaba a existir.
+   *
+   * Se guarda el último estado en combate y se lo sigue mostrando hasta que la
+   * cola se vacíe. No hay riesgo de quedar trabado: mientras `contando` los
+   * botones ya estaban bloqueados, así que no se pierde ninguna interacción.
+   */
+  const ultimoCombate = useRef<State | null>(null);
+  if (state?.fase === "combate") ultimoCombate.current = state;
+  else if (!contando) ultimoCombate.current = null;
+  const congelado =
+    state && state.fase !== "combate" && contando && ultimoCombate.current?.combate
+      ? ultimoCombate.current
+      : null;
 
   if (!state) {
     return (
@@ -89,7 +109,8 @@ export default function Juego() {
     <Inventario state={state} onCerrar={() => setVerInventario(false)} />
   ) : null;
 
-  if (state.fase === "pasillo" && state.mundo) {
+  // Huir también cierra el aula, y su línea también hay que verla.
+  if (state.fase === "pasillo" && state.mundo && !congelado) {
     return (
       <>
         {evento}
@@ -116,6 +137,7 @@ export default function Juego() {
       */}
       <main
         className={`grano mx-auto flex w-full max-w-xl flex-col px-5 ${
+          congelado ||
           state.fase === "combate" ||
           state.fase === "recompensa" ||
           state.fase === "juego"
@@ -125,28 +147,30 @@ export default function Juego() {
       >
         {state.fase !== "sueño" && (
           <Cabecera
-            state={state}
+            state={congelado ?? state}
             vidaMostrada={actual?.vidaJugador}
             onInventario={() => setVerInventario(true)}
           />
         )}
-        {state.fase === "combate" && (
+        {(congelado || state.fase === "combate") && (
           <Combate
-            state={state}
+            state={congelado ?? state}
             dispatch={dispatch}
             contando={contando}
             actual={actual}
             restantes={restantes}
           />
         )}
-        {state.fase === "juego" && state.minijuego && (
+        {!congelado && state.fase === "juego" && state.minijuego && (
           <Juegito juego={state.minijuego} dispatch={dispatch} />
         )}
-        {state.fase === "recompensa" && (
+        {!congelado && state.fase === "recompensa" && (
           <Recompensa state={state} dispatch={dispatch} contando={contando} />
         )}
-        {state.fase === "sueño" && <Sueño state={state} dispatch={dispatch} />}
-        {(state.fase === "muerto" || state.fase === "fin") && (
+        {!congelado && state.fase === "sueño" && (
+          <Sueño state={state} dispatch={dispatch} />
+        )}
+        {!congelado && (state.fase === "muerto" || state.fase === "fin") && (
           <Final
             state={state}
             onRestart={() => {
@@ -1017,7 +1041,21 @@ function useSecuencia(log: Entrada[]) {
     return () => clearTimeout(t);
   }, [cola]);
 
-  return { actual, contando: cola.length > 0, restantes: cola.length };
+  /*
+   * La cola se arma en un efecto, o sea después de pintar. En el render en que
+   * llega el log nuevo todavía está vacía, y ese hueco de un frame alcanzaba
+   * para que la pantalla se fuera del combate antes de mostrar nada.
+   *
+   * `pendiente` lo cubre sincrónicamente: si la cabeza del log no es la que
+   * encolamos la última vez, hay eventos que todavía no se vieron.
+   */
+  const pendiente = cabeza.current !== undefined && log[0] !== cabeza.current;
+
+  return {
+    actual,
+    contando: cola.length > 0 || pendiente,
+    restantes: cola.length,
+  };
 }
 
 /**

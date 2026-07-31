@@ -39,6 +39,7 @@ import {
 import type {
   Accion,
   Action,
+  Combate,
   Defecto,
   Efecto,
   Entrada,
@@ -78,11 +79,12 @@ export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0);
 /**
  * Perilla global del daño enemigo. Se afina midiendo, no a ojo.
  *
- * Bajó de 1,4 a 1,35 cuando las puertas dejaron de ser todas peleas: con un 30%
- * de aulas sin combate se junta menos equipo, así que el mismo multiplicador
- * dejaba a la mitad de los estilos arriba del 60% de muertes.
+ * Bajó a 1,35 cuando las puertas dejaron de ser todas peleas —menos combates es
+ * menos equipo— y subió a 1,65 cuando USAR pasó a ser gratis para las tres
+ * cosas del menú y el bloqueo empezó a parar el golpe entero de verdad. Los
+ * arreglos de claridad del combate le devolvieron al jugador ~15 puntos.
  */
-const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.35);
+const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.65);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -423,50 +425,70 @@ function turnoEnemigo(state: State, rng: Rng): State {
   if (intencion.tipo === "golpe") {
     if (!acierta) {
       s = { ...s, log: logEstado(s, "Va hacia vos y pasa de largo.", "neutral") };
-      if (bloqueaBien) {
-        const d = aplicarDaño(s, bloqueo.daño);
-        s = dañar(s, d);
-        s = { ...s, log: logEstado(s, `Igual estabas firme. Le devolvés ${d}.`, "bueno") };
-      }
     } else {
       // El impacto se cuenta primero y todavía no cuesta nada: el número, y
       // con él la barra, llegan en el evento siguiente.
       let daño = aplicarRecibido(s, (intencion.daño ?? 0) * MULT_ENEMIGO * escalaDaño(s));
       s = { ...s, log: logEstado(s, intencion.impacto ?? "Te alcanza.", "enemigo") };
-      if (s.combate!.escudo) {
+
+      /*
+       * El bloqueo se resuelve antes que el escudo. Al revés, un bloqueo que
+       * salía bien te gastaba igual los anteojos en un golpe que no iba a
+       * entrar: pagabas un único por nada.
+       */
+      if (bloqueaBien) daño = Math.round(daño * PASA_BLOQUEANDO);
+
+      if (daño > 0 && s.combate!.escudo) {
+        daño = 0;
         s = { ...s, combate: { ...s.combate!, escudo: false } };
         s = { ...s, log: logEstado(s, "Lo viste llegar y no te tocó.", "bueno") };
-        return {
-          ...s,
-          log: firmar(s, tope),
-          combate: { ...s.combate!, paso: c.paso + 1, bloqueando: false },
-        };
-      }
-      if (bloqueaBien) daño = Math.max(1, Math.round(daño * PASA_BLOQUEANDO));
-      s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
-      if (bloqueaBien) {
-        s = { ...s, log: logEstado(s, `Lo bloqueás. Sólo −${daño}.`, "bueno") };
-        const d = aplicarDaño(s, bloqueo.daño);
-        s = dañar(s, d);
-        s = { ...s, log: logEstado(s, `Y le devolvés ${d}.`, "bueno") };
-      } else if (c.bloqueando) {
-        s = {
-          ...s,
-          log: logEstado(
-            s,
-            intencion.imparable
-              ? `Te cubrís y pasa igual. −${daño}.`
-              : `No llegás a bloquearlo. −${daño}.`,
-            "malo",
-          ),
-        };
       } else {
-        s = { ...s, log: logEstado(s, `De lleno. −${daño}.`, "malo") };
+        s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
+        /*
+         * Un bloqueo que sale para el golpe entero, igual que para un estado.
+         * Antes se redondeaba con `Math.max(1, …)` y te entraba 1 de daño: la
+         * pantalla decía "lo bloqueás" y la barra bajaba igual.
+         */
+        if (bloqueaBien) {
+          s = {
+            ...s,
+            log: logEstado(
+              s,
+              daño > 0 ? `Lo bloqueás. Sólo −${daño}.` : "Lo bloqueás. No te toca.",
+              "bueno",
+            ),
+          };
+        } else if (c.bloqueando) {
+          s = {
+            ...s,
+            log: logEstado(
+              s,
+              intencion.imparable
+                ? `Te cubrís y pasa igual. −${daño}.`
+                : `No llegás a bloquearlo. −${daño}.`,
+              "malo",
+            ),
+          };
+        } else {
+          s = { ...s, log: logEstado(s, `De lleno. −${daño}.`, "malo") };
+        }
       }
+    }
+    // Cubrirse bien devuelve siempre lo mismo: haya entrado el golpe, lo hayas
+    // parado entero, o te haya errado. Es una sola tirada y un solo resultado.
+    if (bloqueaBien) {
+      const d = aplicarDaño(s, bloqueo.daño);
+      s = dañar(s, d);
+      s = { ...s, log: logEstado(s, `Y le devolvés ${d}.`, "bueno") };
     }
   } else if (intencion.tipo === "efecto" && intencion.efecto) {
     if (bloqueaBien) {
-      // Cubrirse también sirve contra lo que te quiere dejar algo encima.
+      /*
+       * Cubrirse te protege de todo, pero sólo se devuelve lo que te tiraron:
+       * no hay golpe que redirigir. Medido con la devolución también acá, el
+       * pasivo se iba a 22% contra 51% del luchador y bloquear volvía a ser la
+       * respuesta a todo.
+       */
       s = { ...s, log: logEstado(s, "Lo bloqueás. No te llega a agarrar.", "bueno") };
     } else if (!acierta) {
       s = { ...s, log: logEstado(s, "Lo intenta y no te agarra.", "neutral") };
@@ -526,7 +548,13 @@ function cerrarTurno(state: State, rng: Rng): State {
    */
   const yaTorpe = tieneEfecto(state, "torpeza");
   let s = turnoEnemigo(state, rng);
-  if (yaTorpe && s.jugador.vida > 0) {
+  /*
+   * El segundo movimiento sólo existe si los dos siguen en pie. El
+   * contraataque del bloqueo puede haber sido el golpe final, y un enemigo que
+   * ya cayó no puede seguir moviéndose: se veía como matarlo y comerse un
+   * golpe suyo después.
+   */
+  if (yaTorpe && s.jugador.vida > 0 && (s.combate?.vida ?? 0) > 0) {
     // Sigue siendo el turno del enemigo: va firmado como suyo para que la
     // pausa larga caiga antes de esta línea y no en el medio.
     s = {
@@ -535,8 +563,11 @@ function cerrarTurno(state: State, rng: Rng): State {
     };
     s = turnoEnemigo(s, rng);
   }
-  // La lata te cobra su parte todos los turnos, hayas hecho lo que hayas hecho.
-  if (s.combate?.sangria && s.jugador.vida > 0) {
+  /*
+   * La lata te cobra todos los turnos, salvo el turno en que ganaste: cobrarte
+   * después de que el enemigo cayó puede matarte en una pelea que ya terminó.
+   */
+  if (s.combate?.sangria && s.jugador.vida > 0 && s.combate.vida > 0) {
     const costo = s.combate.sangria.porTurno;
     s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - costo } };
     s = { ...s, log: logEstado(s, `La lata te cobra ${costo}.`, "malo", "vos") };
@@ -549,9 +580,16 @@ function cerrarTurno(state: State, rng: Rng): State {
   s = redDeSeguridad(s);
 
   if (s.jugador.vida <= 0) {
+    /*
+     * Morir es un evento más y tiene que poder verse: sin esta línea la
+     * secuencia terminaba en el golpe y la pantalla saltaba al final, así que
+     * lo último que veías era tu propia acción y después la muerte, sin el
+     * turno del enemigo en el medio.
+     */
+    const caido: State = { ...s, jugador: { ...s.jugador, vida: 0 } };
     return {
-      ...s,
-      jugador: { ...s.jugador, vida: 0 },
+      ...caido,
+      log: logEstado(caido, "Se te apaga todo.", "malo", "vos"),
       fase: "muerto",
       combate: null,
       mundo: null,
@@ -895,6 +933,22 @@ function volverAlPasillo(state: State, rng: Rng, forzarSueño: boolean): State {
   return { ...state, fase: "pasillo", caido: null };
 }
 
+/**
+ * La salida común de USAR: item, sombra o poder, ninguno gasta el turno.
+ *
+ * Antes sólo los items eran gratis y la sombra —cuya única función es sacarte
+ * los estados de encima— te cobraba el turno del enemigo. Los tres viven en el
+ * mismo menú y se ven igual, así que el jugador aprendía la regla con uno y la
+ * desaprendía con el otro: limpiabas la confusión y te comías un golpe por
+ * haberla limpiado.
+ *
+ * Se conserva el `bloqueando` con el que entraste: usar algo no te descubre.
+ */
+function salirDeUsar(s: State, c: Combate, rng: Rng): State {
+  if (s.combate!.vida <= 0) return ganarCombate(s, rng);
+  return { ...s, combate: { ...s.combate!, bloqueando: c.bloqueando } };
+}
+
 function turnoDeCombate(
   state: State,
   accion: Accion,
@@ -916,8 +970,17 @@ function turnoDeCombate(
     };
   }
 
-  // El miedo puede hacer que la acción no salga.
-  if (tieneEfecto(s, "miedo") && random(rng) < FALLA_POR_MIEDO) {
+  /*
+   * El miedo puede hacer que la acción no salga, y quedarte duro cuesta el
+   * turno. Pero USAR no gasta el turno nunca, así que acá no puede entrar: si
+   * entrara, la única forma de sacarte el miedo de encima te cobraría el turno
+   * justamente por tenerlo.
+   *
+   * En USAR el miedo se cobra igual, adentro de la tirada propia de cada cosa
+   * (`× factorMiedo`). Eso además es lo que la pantalla venía mostrando desde
+   * siempre: un solo número, un solo resultado posible.
+   */
+  if (accion !== "usar" && tieneEfecto(s, "miedo") && random(rng) < FALLA_POR_MIEDO) {
     s = { ...s, log: log(s.log, "No te sale. Te quedás duro.", "malo") };
     return cerrarTurno(s, rng);
   }
@@ -1023,7 +1086,7 @@ function turnoDeCombate(
           ...s,
           log: logEstado(s, `La sombra de ${ENEMIGOS[id].nombre} se interpone.`, "bueno"),
         };
-        break;
+        return salirDeUsar(s, c, rng);
       }
 
       if (ref.startsWith("poder:")) {
@@ -1042,9 +1105,9 @@ function turnoDeCombate(
             },
           },
         };
-        if (random(rng) > poder.precision) {
+        if (random(rng) > poder.precision * factorMiedo(s)) {
           s = { ...s, log: logEstado(s, `${poder.nombre} no llega a agarrar.`, "malo") };
-          break;
+          return salirDeUsar(s, c, rng);
         }
         if (poder.efecto.daño) s = dañar(s, aplicarDaño(s, poder.efecto.daño));
         if (poder.efecto.vida) {
@@ -1058,12 +1121,9 @@ function turnoDeCombate(
         }
         if (poder.efecto.limpia) s = { ...s, efectos: [] };
         s = { ...s, log: logEstado(s, `${poder.nombre}.`, "sueño") };
-        break;
+        return salirDeUsar(s, c, rng);
       }
 
-      // Los items se consumen para siempre, pero NO gastan el turno: usarlos
-      // es gratis en tiempo y caro en recursos. Eso los vuelve una decisión
-      // de "cuándo lo quemo" y no de "vale la pena perder un turno".
       const idx = s.jugador.items.indexOf(ref);
       if (idx === -1) return s;
       const item = ITEMS[ref];
@@ -1071,9 +1131,9 @@ function turnoDeCombate(
         ...s,
         jugador: { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) },
       };
-      if (random(rng) > item.precision) {
+      if (random(rng) > item.precision * factorMiedo(s)) {
         s = { ...s, log: logEstado(s, `${item.nombre} se te escapa de la mano.`, "malo") };
-        return { ...s, combate: { ...s.combate!, bloqueando: c.bloqueando } };
+        return salirDeUsar(s, c, rng);
       }
       if (item.efecto.vida) {
         s = {
@@ -1094,9 +1154,7 @@ function turnoDeCombate(
         s = { ...s, combate: { ...s.combate!, sangria: item.efecto.sangria } };
       }
       s = { ...s, log: logEstado(s, `Usás ${item.nombre}.`, "bueno") };
-      // Sale sin pasar por el turno del enemigo.
-      if (s.combate!.vida <= 0) return ganarCombate(s, rng);
-      return { ...s, combate: { ...s.combate!, bloqueando: c.bloqueando } };
+      return salirDeUsar(s, c, rng);
     }
   }
 

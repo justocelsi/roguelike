@@ -21,6 +21,7 @@ import {
   armasUsables,
   initialState,
   MAX_ARMAS,
+  PASA_BLOQUEANDO,
   reduce,
   tieneEfecto,
   usosArma,
@@ -61,7 +62,9 @@ function curar(s: State, umbral: number, guarda: boolean): Action | null {
     const it = j.items.find((i) => ITEMS[i].efecto.vida);
     if (it) return { type: "combate", accion: "usar", ref: it };
   }
-  const pod = j.poderes.find((id) => usosPoder(s, id) > 0 && PODERES[id].efecto.vida);
+  const pod = j.poderes.find(
+    (id) => !PODERES[id].pasivo && usosPoder(s, id) > 0 && PODERES[id].efecto.vida,
+  );
   return pod ? { type: "combate", accion: "usar", ref: `poder:${pod}` } : null;
 }
 
@@ -121,8 +124,30 @@ type Estilo = {
   turno: "luchador" | "pasivo" | "calculador";
 };
 
-function decidir(s: State, e: Estilo): Action {
+/**
+ * Todo lo que sale por USAR es gratis en tiempo, así que un jugador que mira la
+ * pantalla vacía el cargador antes de pegar: los usos de los poderes vuelven en
+ * la próxima pelea y guardarlos no compra nada.
+ *
+ * Los items sí valen guardarse —no se recargan— y de eso se ocupa `curar`.
+ */
+function gratis(s: State, e: Estilo): Action | null {
+  const j = s.jugador;
+  // Sacarse los estados de encima, si la pelea todavía tiene cuerda como para
+  // que valga gastar un trofeo.
+  if (s.efectos.length && j.sombras.length && s.combate!.vida > s.combate!.vidaMax * 0.4) {
+    return { type: "combate", accion: "usar", ref: `sombra:${j.sombras[0]}` };
+  }
   const c = curar(s, e.cura, e.guarda);
+  if (c) return c;
+  const pod = j.poderes.find(
+    (id) => !PODERES[id].pasivo && usosPoder(s, id) > 0 && PODERES[id].efecto.daño,
+  );
+  return pod ? { type: "combate", accion: "usar", ref: `poder:${pod}` } : null;
+}
+
+function decidir(s: State, e: Estilo): Action {
+  const c = gratis(s, e);
   if (c) return c;
   if (e.turno === "luchador") return pegar(s, e.bruto);
 
@@ -310,6 +335,55 @@ function reglas() {
       }
 
       /*
+       * Nadie muere sin ver morirse. Si la vida llegó a cero, en el mismo paso
+       * tiene que estar lo que hizo el enemigo y la línea de la muerte: sin
+       * ellas el jugador hace su acción y aparece la pantalla del final, como
+       * si el juego hubiera hecho la cuenta sin mostrarla.
+       */
+      if (s.fase === "muerto" && antes.fase === "combate") {
+        if (!nuevas.some((e) => e.actor === "eso")) {
+          fallo("morir se ve venir", "no hay turno del enemigo en el paso final");
+        }
+        if (!nuevas.some((e) => e.texto === "Se te apaga todo.")) {
+          fallo("morir se ve venir", "no hay línea de muerte");
+        }
+      }
+
+      if (a.type === "combate") {
+        /*
+         * Un bloqueo que sale para el golpe entero, igual que para un estado.
+         * `Math.max(1, …)` sobre un daño que ya era cero dejaba pasar 1: la
+         * pantalla decía "lo bloqueás" y la barra bajaba igual.
+         */
+        for (const e of nuevas) {
+          const m = /^Lo bloqueás\. Sólo −(\d+)\.$/.exec(e.texto);
+          if (m && Number(m[1]) > 0 && PASA_BLOQUEANDO === 0) {
+            fallo("un bloqueo que sale para el golpe entero", e.texto);
+          }
+        }
+
+        /*
+         * USAR no gasta el turno: ni item, ni sombra, ni poder. Los tres viven
+         * en el mismo menú, así que una excepción se aprende como una trampa.
+         */
+        if (a.accion === "usar" && nuevas.some((e) => e.actor === "eso")) {
+          fallo("usar no le da el turno al enemigo", String(a.ref));
+        }
+
+        /*
+         * Y un enemigo que ya cayó no sigue moviéndose: el contraataque puede
+         * haber sido el golpe final y la torpeza le daba un segundo turno.
+         */
+        const cronologico = [...nuevas].reverse();
+        const cayo = cronologico.findIndex(
+          (e) => e.vidaEnemigo !== undefined && e.vidaEnemigo <= 0,
+        );
+        if (cayo !== -1 && cronologico.slice(cayo + 1).some((e) => e.actor === "eso")) {
+          fallo("un enemigo caído no se mueve más");
+        }
+      }
+
+      /*
        * Lo que dice la pantalla de recompensa tiene que estar en el bolsillo.
        * La bendición armaba el botín para mostrarlo y no lo guardaba: te decía
        * "encontrás algo" y no encontrabas nada. Se ve mirando el bolsillo
@@ -354,6 +428,10 @@ function reglas() {
     "el estado que te agarra queda marcado",
     "botín de su materia",
     "el botín que se muestra es el que se guarda",
+    "morir se ve venir",
+    "un bloqueo que sale para el golpe entero",
+    "usar no le da el turno al enemigo",
+    "un enemigo caído no se mueve más",
   ];
   let todo = true;
   for (const r of REGLAS) {
@@ -387,28 +465,45 @@ function juegos() {
   const repartos = new Set<string>();
   let sinCien = 0;
   let noEntero = 0;
+  let noRedondo = 0;
   let sorteoFueraDeLectura = 0;
+  /*
+   * Un riesgo en múltiplos de 10 se piensa de cabeza caminando el pasillo. La
+   * única excepción permitida es la puerta que reparte parejo, que se lee igual
+   * de rápido: "acá puede pasar cualquiera".
+   */
+  const redonda = (probs: number[]) =>
+    probs.every((p) => p % 10 === 0) || probs.every((p) => p === 33 || p === 34);
+
   for (let n = 0; n < 4000; n++) {
     const rng: Rng = { seed: (Math.random() * 1e9) | 0 };
     for (const p of generarPasillo(rng, { cantidadPuertas: 5 }).puertas) {
       if (p.profesor) continue;
-      const suma = p.lecturas.reduce((t, l) => t + l.prob, 0);
-      if (suma !== 100) sinCien++;
-      if (p.lecturas.some((l) => !Number.isInteger(l.prob))) noEntero++;
+      const probs = p.lecturas.map((l) => l.prob);
+      if (probs.reduce((t, x) => t + x, 0) !== 100) sinCien++;
+      if (probs.some((x) => !Number.isInteger(x))) noEntero++;
+      if (!redonda(probs)) noRedondo++;
       if (!p.lecturas.some((l) => l.suceso === p.sorteado)) sorteoFueraDeLectura++;
       repartos.add(p.forma);
     }
   }
   debe("los porcentajes suman 100", sinCien, 0);
   debe("los porcentajes son enteros", noEntero, 0);
+  debe("los porcentajes van de a 10, salvo la pareja", noRedondo, 0);
   debe("lo que pasa estaba en la lista", sorteoFueraDeLectura, 0);
-  debe("aparecen las cuatro formas de puerta", repartos.size, FORMAS_PUERTA.length);
+  debe("aparecen todas las formas de puerta", repartos.size, FORMAS_PUERTA.length);
 
   // Y ninguna forma puede prometer algo que no puede cumplir.
+  let repartoParejo = 0;
   for (const f of FORMAS_PUERTA) {
-    const suma = f.reparto.pelea + f.reparto.bendicion + f.reparto.juego;
-    debe(`la puerta ${f.id} reparte 100`, suma, 100);
+    const probs: number[] = [f.reparto.pelea, f.reparto.bendicion, f.reparto.juego].filter(
+      (p) => p > 0,
+    );
+    debe(`la puerta ${f.id} reparte 100`, probs.reduce((t, x) => t + x, 0), 100);
+    debe(`la puerta ${f.id} se lee de un vistazo`, redonda(probs), true);
+    if (probs.every((p) => p === 33 || p === 34)) repartoParejo++;
   }
+  debe("hay una sola puerta que reparte parejo", repartoParejo, 1);
 
   // --- el pizarrón -----------------------------------------------------
   // 4 de 4 paga 2, 3 de 4 paga 1, 2 de 4 no paga nada.
