@@ -35,7 +35,13 @@ import {
   type Puerta,
 } from "@/game/mundo";
 import { DEFECTOS, PODERES } from "@/game/poderes";
-import { ICONOS, ICONOS_EFECTO, SPRITES } from "@/game/sprites";
+import {
+  ICONOS,
+  ICONOS_ACCION,
+  ICONOS_EFECTO,
+  ICONOS_ITEM,
+  SPRITES,
+} from "@/game/sprites";
 import type { Accion, Action, Entrada, Intencion, State } from "@/game/types";
 
 /** Cuánto dura un evento común en pantalla. */
@@ -54,6 +60,7 @@ export default function Juego() {
   // teletransporte al principio del pasillo.
   const pos = useRef<{ x: number; y: number } | null>(null);
   const cicloAnterior = useRef(1);
+  const [verInventario, setVerInventario] = useState(false);
   // La secuencia también vive acá: el golpe que mata cambia de pantalla, y
   // esas líneas tienen que terminar de verse igual.
   const { actual, contando, restantes } = useSecuencia(state?.log ?? SIN_LOG);
@@ -77,12 +84,17 @@ export default function Juego() {
   // Sólo los estados frenan la pantalla entera; el resto va en línea.
   const evento =
     actual?.icono ? <EventoEfecto entrada={actual} k={restantes} /> : null;
+  const inventario = verInventario ? (
+    <Inventario state={state} onCerrar={() => setVerInventario(false)} />
+  ) : null;
 
   if (state.fase === "pasillo" && state.mundo) {
     return (
       <>
         {evento}
+        {inventario}
         <Pasillo
+          onInventario={() => setVerInventario(true)}
           state={state}
           mundo={state.mundo}
           pos={pos}
@@ -95,6 +107,7 @@ export default function Juego() {
   return (
     <>
       {evento}
+      {inventario}
       {/*
         El combate entra entero en la pantalla y no se scrollea: mirar para
         abajo en medio de un turno es perder el hilo de lo que está pasando.
@@ -108,7 +121,11 @@ export default function Juego() {
         }`}
       >
         {state.fase !== "sueño" && (
-          <Cabecera state={state} vidaMostrada={actual?.vidaJugador} />
+          <Cabecera
+            state={state}
+            vidaMostrada={actual?.vidaJugador}
+            onInventario={() => setVerInventario(true)}
+          />
         )}
         {state.fase === "combate" && (
           <Combate
@@ -187,11 +204,13 @@ function Pasillo({
   mundo,
   pos,
   onEntrar,
+  onInventario,
 }: {
   state: State;
   mundo: Mundo;
   pos: React.RefObject<{ x: number; y: number } | null>;
   onEntrar: (p: Puerta) => void;
+  onInventario: () => void;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [cerca, setCerca] = useState<Puerta | null>(null);
@@ -431,7 +450,7 @@ function Pasillo({
 
   return (
     <main className="grano mx-auto flex w-full max-w-3xl flex-1 flex-col gap-4 px-5 py-8">
-      <Cabecera state={state} />
+      <Cabecera state={state} onInventario={onInventario} />
 
       <div
         className="relative touch-none border border-dimmer select-none"
@@ -671,13 +690,182 @@ function Etiqueta({
   );
 }
 
+/**
+ * El inventario completo, en una hoja. Se abre desde cualquier pantalla, no
+ * gasta nada y no cambia el estado: es para mirar, no para usar.
+ */
+function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void }) {
+  const j = state.jugador;
+  const pasivosDeSueño = j.poderes.filter((id) => PODERES[id].pasivo);
+  const activos = j.poderes.filter((id) => !PODERES[id].pasivo);
+  return (
+    <div className="fixed inset-0 z-[80] flex flex-col bg-background/98">
+      <div className="mx-auto flex w-full max-w-xl flex-1 flex-col gap-4 overflow-y-auto px-5 py-6">
+        <div className="flex items-baseline justify-between">
+          <h2 className="text-lg font-bold tracking-widest text-agua">LO QUE LLEVÁS</h2>
+          <button
+            onClick={onCerrar}
+            className="border border-borde px-4 py-2 text-sm tracking-widest text-dim hover:border-agua hover:text-foreground"
+          >
+            CERRAR
+          </button>
+        </div>
+
+        <Seccion titulo="ARMAS" vacio="Con las manos.">
+          {j.armas.map((id) => (
+            <Ficha key={id} icono={ICONOS_ACCION.arma} tono="text-oro" nombre={ARMAS[id].nombre}>
+              {ARMAS[id].daño} de daño · acierta {Math.round(ARMAS[id].precision * 100)} de
+              cada 100 ·{" "}
+              {ARMAS[id].infinita
+                ? "no se gasta"
+                : `${ARMAS[id].usos} usos por pelea, se recargan en la siguiente`}
+              {ARMAS[id].critico > 0 &&
+                ` · ${Math.round(ARMAS[id].critico * 100)}% de pegar el doble`}
+              {ARMAS[id].perdida
+                ? ` · ${Math.round(ARMAS[id].perdida * 100)}% de perderla en un rebote`
+                : ""}
+            </Ficha>
+          ))}
+        </Seccion>
+
+        <Seccion titulo="EN EL BOLSILLO" vacio="Nada.">
+          {agrupar(j.items).map(([id, n]) => (
+            <Ficha
+              key={id}
+              icono={ICONOS_ITEM[id]}
+              tono={tonoItem(id)}
+              nombre={ITEMS[id].nombre}
+              cantidad={n}
+              etiqueta={NOMBRE_RAREZA[ITEMS[id].rareza]}
+            >
+              {ITEMS[id].descripcion} · acierta {Math.round(ITEMS[id].precision * 100)} de
+              cada 100 · no gasta el turno
+            </Ficha>
+          ))}
+        </Seccion>
+
+        <Seccion titulo="SOMBRAS" vacio="Todavía no venciste a nada.">
+          {agrupar(j.sombras).map(([id, n]) => (
+            <Ficha
+              key={id}
+              icono={ICONOS_EFECTO.confusion}
+              tono="text-sueno"
+              nombre={`la sombra de ${ENEMIGOS[id].nombre}`}
+              cantidad={n}
+            >
+              Te saca los estados que tengas encima. De un solo uso.
+            </Ficha>
+          ))}
+        </Seccion>
+
+        <Seccion titulo="PODERES" vacio="El sueño todavía no te dio nada.">
+          {activos.map((id) => (
+            <Ficha
+              key={id}
+              icono={ICONOS_ACCION.usar}
+              tono={PODERES[id].efecto.vida ? "text-salud" : "text-sueno"}
+              nombre={PODERES[id].nombre}
+            >
+              {PODERES[id].texto} · {PODERES[id].usos} usos por pelea
+            </Ficha>
+          ))}
+          {pasivosDeSueño.map((id) => (
+            <Ficha
+              key={id}
+              icono={ICONOS_ACCION.bloquear}
+              tono="text-sueno"
+              nombre={PODERES[id].nombre}
+              etiqueta="siempre activo"
+            >
+              {PODERES[id].texto}
+            </Ficha>
+          ))}
+        </Seccion>
+
+        <Seccion titulo="LO QUE TE COSTÓ" vacio="Todavía nada.">
+          {j.defectos.map((id) => (
+            <Ficha key={id} icono={ICONOS_EFECTO.torpeza} tono="text-malo" nombre={DEFECTOS[id].nombre}>
+              {DEFECTOS[id].texto}
+            </Ficha>
+          ))}
+        </Seccion>
+      </div>
+    </div>
+  );
+}
+
+/** Junta repetidos: ["agua","agua"] → [["agua", 2]] */
+function agrupar(ids: string[]): [string, number][] {
+  const m = new Map<string, number>();
+  for (const id of ids) m.set(id, (m.get(id) ?? 0) + 1);
+  return [...m.entries()];
+}
+
+function Seccion({
+  titulo,
+  vacio,
+  children,
+}: {
+  titulo: string;
+  vacio: string;
+  children: React.ReactNode[];
+}) {
+  const hay = children.flat().filter(Boolean).length > 0;
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm tracking-[0.3em] text-dim">{titulo}</h3>
+      {hay ? children : <p className="text-sm text-borde">{vacio}</p>}
+    </section>
+  );
+}
+
+function Ficha({
+  icono,
+  tono,
+  nombre,
+  cantidad,
+  etiqueta,
+  children,
+}: {
+  icono: string[];
+  tono: string;
+  nombre: string;
+  cantidad?: number;
+  etiqueta?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-3 border border-borde px-3 py-2.5">
+      <Pixeles data={icono} clase={`mt-0.5 w-5 shrink-0 ${tono}`} />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline gap-x-2">
+          <span className={`text-base ${tono}`}>{nombre}</span>
+          {cantidad && cantidad > 1 && (
+            <span className="tabular-nums text-agua">×{cantidad}</span>
+          )}
+          {etiqueta && <span className="text-sm text-dim">{etiqueta}</span>}
+        </div>
+        <p className="mt-0.5 text-sm leading-snug text-dim">{children}</p>
+      </div>
+    </div>
+  );
+}
+
 /** Cuántos usos mostrar de un arma: ∞ para las que no se gastan. */
 function usosTexto(state: State, id: string): string {
   if (ARMAS[id].infinita) return "∞";
   return String(state.combate ? usosArma(state, id) : ARMAS[id].usos);
 }
 
-function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number }) {
+function Cabecera({
+  state,
+  vidaMostrada,
+  onInventario,
+}: {
+  state: State;
+  vidaMostrada?: number;
+  onInventario?: () => void;
+}) {
   const j = state.jugador;
   const c = confundido(state);
   const vida = vidaMostrada ?? j.vida;
@@ -687,11 +875,23 @@ function Cabecera({ state, vidaMostrada }: { state: State; vidaMostrada?: number
         <span className="text-agua">
           CICLO {state.ciclo}/{CICLOS}
         </span>
-        <span>
-          {j.armas.length
-            ? j.armas.map((id) => `${ARMAS[id].nombre} ×${usosTexto(state, id)}`).join(" · ")
-            : "con las manos"}
-        </span>
+        <div className="flex items-center gap-3">
+          <span className="text-oro">
+            {j.armas.length
+              ? j.armas.map((id) => `${ARMAS[id].nombre} ×${usosTexto(state, id)}`).join(" · ")
+              : "con las manos"}
+          </span>
+          {onInventario && (
+            <button
+              onClick={onInventario}
+              title="Ver todo lo que llevás"
+              className="flex items-center gap-1.5 border border-borde px-2 py-1 tracking-widest text-dim transition-colors hover:border-agua hover:text-foreground"
+            >
+              <Pixeles data={ICONOS_ACCION.usar} clase="w-3 shrink-0 text-oro" />
+              BOLSILLO
+            </button>
+          )}
+        </div>
       </div>
       <Barra valor={vida} max={j.vidaMax} />
       <div className="flex justify-between text-sm text-dim">
@@ -935,12 +1135,14 @@ function Combate({
     ...j.items.map((id, i) => ({
       ref: id,
       key: `i${i}`,
+      icono: ICONOS_ITEM[id],
       texto: `${ITEMS[id].nombre} · ${pct(ITEMS[id].precision)}% — ${ITEMS[id].descripcion}`,
-      clase: COLOR_RAREZA[ITEMS[id].rareza],
+      clase: tonoItem(id),
     })),
     ...j.sombras.map((id, i) => ({
       ref: `sombra:${id}`,
       key: `s${i}`,
+      icono: ICONOS_EFECTO.confusion,
       texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los estados que tengas encima`,
       clase: "text-sueno",
     })),
@@ -949,8 +1151,9 @@ function Combate({
       .map((id) => ({
         ref: `poder:${id}`,
         key: id,
+        icono: ICONOS_ACCION.usar,
         texto: `${PODERES[id].nombre} ×${usosPoder(state, id)} · ${pct(PODERES[id].precision)}% — ${PODERES[id].texto}`,
-        clase: "text-agua",
+        clase: PODERES[id].efecto.vida ? "text-salud" : "text-sueno",
       })),
   ];
 
@@ -1029,22 +1232,28 @@ function Combate({
       <div className={`grid shrink-0 grid-cols-2 gap-2 ${contando ? "pointer-events-none opacity-40" : ""}`}>
         <Boton
           label="ATACAR"
+          icono={ICONOS_ACCION.atacar}
           sub={`${DAÑO_ATAQUE} · ${pct(PRECISION_ATAQUE)}%`}
           onClick={() => act("atacar")}
         />
         <Boton
           label="BLOQUEAR"
+          icono={ICONOS_ACCION.bloquear}
           sub={`para todo y devolvés ${bloqueoDe(state).daño} · ${Math.round(bloqueoDe(state).precision * 100)}%`}
           onClick={() => act("bloquear")}
         />
         <Boton
           label={usables.length ? "ARMA" : "SIN ARMA"}
+          icono={ICONOS_ACCION.arma}
+          tono="text-oro"
           sub={usables.length ? `${usables.length} a mano` : "—"}
           disabled={usables.length === 0}
           onClick={() => setMenu(menu === "armas" ? null : "armas")}
         />
         <Boton
           label="USAR"
+          icono={ICONOS_ACCION.usar}
+          tono="text-oro"
           sub={`${guardado.length} · no gasta turno`}
           disabled={guardado.length === 0}
           onClick={() => setMenu(menu === "usar" ? null : "usar")}
@@ -1057,8 +1266,9 @@ function Combate({
             <button
               key={id}
               onClick={() => act("arma", id)}
-              className="block w-full text-left text-sm text-foreground hover:text-agua"
+              className="flex w-full items-center gap-2 text-left text-sm text-oro hover:text-foreground"
             >
+              <Pixeles data={ICONOS_ACCION.arma} clase="w-3.5 shrink-0" />
               {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
               {pct(precisionArma(state, id))}% · {usosTexto(state, id)} usos
               {ARMAS[id].critico > 0 && ` · ${Math.round(ARMAS[id].critico * 100)}% crítico`}
@@ -1073,8 +1283,9 @@ function Combate({
             <button
               key={g.key}
               onClick={() => act("usar", g.ref)}
-              className={`block w-full text-left text-sm hover:text-foreground ${g.clase}`}
+              className={`flex w-full items-center gap-2 text-left text-sm hover:text-foreground ${g.clase}`}
             >
+              {g.icono && <Pixeles data={g.icono} clase="w-3.5 shrink-0" />}
               {g.texto}
             </button>
           ))}
@@ -1095,11 +1306,16 @@ function Combate({
 function Boton({
   label,
   sub,
+  icono,
+  tono = "text-agua",
   disabled,
   onClick,
 }: {
   label: string;
   sub?: string;
+  /** El dibujo va al lado del texto, no en lugar de él. */
+  icono?: string[];
+  tono?: string;
   disabled?: boolean;
   onClick: () => void;
 }) {
@@ -1107,10 +1323,13 @@ function Boton({
     <button
       onClick={onClick}
       disabled={disabled}
-      className="group border border-borde p-3 text-center transition-all hover:border-agua hover:bg-agua/10 active:bg-agua/20 disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-borde disabled:hover:bg-transparent"
+      className="group border border-borde p-3 transition-all hover:border-agua hover:bg-agua/10 active:bg-agua/20 disabled:cursor-not-allowed disabled:opacity-25 disabled:hover:border-borde disabled:hover:bg-transparent"
     >
-      <div className="truncate text-sm font-bold">{label}</div>
-      {sub && <div className="mt-0.5 text-sm text-dim">{sub}</div>}
+      <div className="flex items-center justify-center gap-2">
+        {icono && <Pixeles data={icono} clase={`w-4 shrink-0 ${tono}`} />}
+        <span className="truncate text-sm font-bold">{label}</span>
+      </div>
+      {sub && <div className="mt-1 text-center text-sm text-dim">{sub}</div>}
     </button>
   );
 }
@@ -1322,10 +1541,15 @@ function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
   );
 }
 
+/** Lo que cura se pinta de verde, sea de la rareza que sea. */
+function tonoItem(id: string): string {
+  return ITEMS[id].efecto.vida ? "text-salud" : COLOR_RAREZA[ITEMS[id].rareza];
+}
+
 /** La rareza se lee de un vistazo por el color. */
 const COLOR_RAREZA: Record<string, string> = {
   comun: "text-dim",
-  raro: "text-agua",
+  raro: "text-oro",
   unico: "text-sueno",
 };
 const NOMBRE_RAREZA: Record<string, string> = {

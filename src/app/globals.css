@@ -18,6 +18,16 @@
   --sueno: #b3a2d8; /* 8.5 */
   --agua-hondo: #35a294; /* 6.2 */
 
+  /*
+   * Dos tonos más, con un rol fijo cada uno para que el color signifique algo
+   * en vez de sólo decorar:
+   *   agua  = la interfaz y vos      oro   = lo que encontrás
+   *   salud = lo que te cura          sueño = lo que viene del sueño
+   *   malo  = el enemigo y el daño
+   */
+  --oro: #d9a441; /*    8.6 */
+  --salud: #7fc98a; /*  9.8 */
+
   /* Sólo bordes y fondos. */
   --borde: #1c3f39;
   --borde-suave: #142825;
@@ -34,6 +44,8 @@
   --color-borde-suave: var(--borde-suave);
   --color-malo: var(--malo);
   --color-sueno: var(--sueno);
+  --color-oro: var(--oro);
+  --color-salud: var(--salud);
   --font-mono: var(--font-geist-mono);
 }
 

@@ -200,6 +200,19 @@ interceptores sobre el motor — agregar uno es agregar un objeto a un catálogo
 Oscuro con verde agua, híbrido pixel/brutalista. Los sprites son grillas de
 texto renderizadas en CSS: pixel art sin un solo archivo de imagen.
 
+**Cinco colores, con un rol fijo cada uno.** El color significa algo en vez de
+sólo decorar, así se lee sin tener que pensarlo:
+
+| Color | Qué señala |
+|---|---|
+| **agua** | la interfaz y vos |
+| **oro** | lo que encontrás — armas e items valiosos |
+| **salud** | lo que te cura |
+| **sueño** | lo que viene del sueño — poderes, defectos, únicos |
+| **malo** | el enemigo y el daño |
+
+Todos medidos contra el fondo: pasan AA para texto normal.
+
 El sueño invierte la paleta: fondo claro, todo ordenado, sin ruido.
 
 **Tono: terror onírico.** Serio, sin guiños.
