@@ -207,6 +207,16 @@ export type Entrada = {
   /** Si el evento tiene un símbolo propio, cuál. */
   icono?: Efecto;
   /**
+   * La tirada que resolvió este evento, cuando la hubo.
+   *
+   * `prob` es la chance real de que saliera —ya con el miedo adentro—, que es
+   * exactamente el número que el botón venía mostrando antes de apretarlo. La
+   * interfaz hace girar el reloj sobre esa chance y lo deja caer del lado que
+   * efectivamente tocó, así que el azar se ve ocurrir en vez de aparecer ya
+   * resuelto en una línea de texto.
+   */
+  tirada?: { prob: number; salio: boolean };
+  /**
    * Es el enemigo mostrando qué va a hacer el turno que viene. Se queda más
    * tiempo en pantalla que el resto: es lo único que el jugador necesita leer
    * para decidir.

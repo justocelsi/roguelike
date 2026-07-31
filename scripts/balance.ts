@@ -5,6 +5,7 @@
  *   npx tsx scripts/balance.ts            todo
  *   npx tsx scripts/balance.ts estilos    sólo el balance
  *   npx tsx scripts/balance.ts reglas     sólo las invariantes
+ *   RULETA=1 npx tsx scripts/balance.ts reglas   qué salió en cada arco
  *
  * No es un test unitario: es una forma de contestar preguntas de diseño con
  * números en vez de con intuición. La pregunta que responde no es "¿cuál
@@ -256,6 +257,17 @@ function reglas() {
     if (!ej[r]) ej[r] = d;
   };
 
+  /*
+   * Cada tirada que el reloj va a mostrar, agrupada por el porcentaje que
+   * declara. Es la prueba más fuerte que se le puede hacer a la ruleta: si el
+   * arco dice 64% y la aguja cae en éxito el 90% de las veces, el reloj miente
+   * — y mentir sobre el azar declarado es justo lo que el juego no puede hacer.
+   *
+   * Ya agarró uno: la tirada del bloqueo multiplicaba por el miedo una segunda
+   * vez, cuando esa tirada ya se había hecho al apretar el botón.
+   */
+  const ruleta: Record<number, { n: number; salieron: number }> = {};
+
   for (let n = 0; n < 1200; n++) {
     let s = initialState((Math.random() * 1e9) | 0);
     let pasos = 0;
@@ -327,6 +339,17 @@ function reglas() {
       if (a.type === "combate" && nuevas.some((e) => e.texto.includes("No te sale")) && !teniaMiedo) {
         fallo("el miedo sólo actúa si lo tenés");
       }
+      for (const e of nuevas) {
+        if (!e.tirada) continue;
+        const { prob, salio } = e.tirada;
+        if (!Number.isInteger(prob) || prob < 0 || prob > 100) {
+          fallo("la ruleta muestra un porcentaje entero", String(prob));
+        }
+        const b = (ruleta[prob] ??= { n: 0, salieron: 0 });
+        b.n++;
+        if (salio) b.salieron++;
+      }
+
       const limpiado =
         s.fase !== "combate" || nuevas.some((e) => /Usás|se interpone|Lucidez|timbre/.test(e.texto));
       for (const e of nuevas) {
@@ -416,6 +439,36 @@ function reglas() {
     }
   }
 
+  /*
+   * El margen se calcula, no se elige: unos cuatro errores estándar de una
+   * binomial, con un piso para los grupos grandes donde el error tiende a cero.
+   *
+   * Un umbral fijo no sirve. Con "400 muestras y 6%" se escapaba justo el caso
+   * que había: la tirada del miedo al apretar BLOQUEAR anotaba 63% pero sólo
+   * aparecía cuando fallaba —el éxito no genera ningún evento, sólo te deja
+   * cubierto—, así que ese arco caía del lado bueno el 4,9% de las veces y con
+   * 266 muestras el test lo dejaba pasar por poco.
+   */
+  for (const [texto, b] of Object.entries(ruleta)) {
+    if (b.n < 120) continue;
+    const prob = Number(texto);
+    const p = prob / 100;
+    const real = (b.salieron / b.n) * 100;
+    const margen = Math.max(4, 4 * Math.sqrt((p * (1 - p)) / b.n) * 100);
+    if (Math.abs(real - prob) > margen) {
+      fallo(
+        "la ruleta no miente",
+        `dice ${prob}% y sale ${real.toFixed(1)}% en ${b.n} tiradas`,
+      );
+    }
+  }
+
+  if (process.env.RULETA) {
+    for (const [prob, b] of Object.entries(ruleta).sort((x,y)=>Number(x[0])-Number(y[0]))) {
+      console.log(`    ruleta ${prob}%  n=${b.n}  real=${((b.salieron/b.n)*100).toFixed(1)}%`);
+    }
+  }
+
   const REGLAS = [
     "la vida entra llena",
     "los usos entran recargados",
@@ -433,6 +486,8 @@ function reglas() {
     "un bloqueo que sale para el golpe entero",
     "usar no le da el turno al enemigo",
     "un enemigo caído no se mueve más",
+    "la ruleta muestra un porcentaje entero",
+    "la ruleta no miente",
   ];
   let todo = true;
   for (const r of REGLAS) {

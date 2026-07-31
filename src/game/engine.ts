@@ -114,6 +114,20 @@ export function factorMiedo(state: State): number {
   return tieneEfecto(state, "miedo") ? 1 - FALLA_POR_MIEDO : 1;
 }
 
+/**
+ * Deja anotada la tirada que resolvió un evento: la chance real de que saliera
+ * y de qué lado cayó.
+ *
+ * `base × factorMiedo` es exactamente el número que el botón venía mostrando
+ * antes de apretarlo. Que sean dos tiradas por dentro —el miedo primero y la
+ * puntería después— no le importa a nadie: lo que el jugador apostó fue ese
+ * número, y sobre ese número tiene que girar el reloj.
+ */
+function conTirada(state: State, base: number, salio: boolean, conMiedo = true) {
+  const p = conMiedo ? base * factorMiedo(state) : base;
+  return { tirada: { prob: Math.round(p * 100), salio } };
+}
+
 /** Cuántas armas entran en la mochila. Llenarla obliga a elegir. */
 export const MAX_ARMAS = 3;
 
@@ -254,7 +268,7 @@ function log(
   texto: string,
   tipo: Entrada["tipo"] = "neutral",
   actor?: Entrada["actor"],
-  extra?: { icono?: Efecto; aviso?: boolean },
+  extra?: { icono?: Efecto; aviso?: boolean; tirada?: Entrada["tirada"] },
 ): Entrada[] {
   return [{ texto, tipo, actor, ...extra }, ...entradas].slice(0, 30);
 }
@@ -269,7 +283,7 @@ function logEstado(
   texto: string,
   tipo: Entrada["tipo"] = "neutral",
   actor?: Entrada["actor"],
-  extra?: { icono?: Efecto; aviso?: boolean },
+  extra?: { icono?: Efecto; aviso?: boolean; tirada?: Entrada["tirada"] },
 ): Entrada[] {
   return [
     {
@@ -416,15 +430,33 @@ function turnoEnemigo(state: State, rng: Rng): State {
   const tope = state.log[0];
 
   const acierta = random(rng) <= (intencion.precision ?? 0.85);
-  /** Si te pusiste a bloquear, una sola tirada decide todo el resultado. */
+  /**
+   * Si te pusiste a bloquear, una sola tirada decide todo el resultado — y el
+   * miedo va adentro de ésta, no en una aparte al apretar el botón. Es el mismo
+   * número que muestra BLOQUEAR y el mismo que gira en el reloj.
+   */
   const bloqueo = bloqueoDe(s);
+  const chanceBloqueo = bloqueo.precision * factorMiedo(s);
   // Un golpe imparable atraviesa el bloqueo: cubrirse no sirve de nada.
   const bloqueaBien =
-    c.bloqueando && !intencion.imparable && random(rng) <= bloqueo.precision;
+    c.bloqueando && !intencion.imparable && random(rng) <= chanceBloqueo;
+  /*
+   * Cubrirse es la única acción del jugador que no se resuelve cuando la
+   * apretás: el reloj gira recién cuando el golpe llega, que es donde está la
+   * tensión. Contra un golpe imparable no hay tirada, y no tiene que haber
+   * reloj: la pantalla ya dijo que no se puede bloquear.
+   */
+  const delBloqueo =
+    c.bloqueando && !intencion.imparable
+      ? conTirada(s, bloqueo.precision, bloqueaBien)
+      : undefined;
 
   if (intencion.tipo === "golpe") {
     if (!acierta) {
-      s = { ...s, log: logEstado(s, "Va hacia vos y pasa de largo.", "neutral") };
+      s = {
+        ...s,
+        log: logEstado(s, "Va hacia vos y pasa de largo.", "neutral", undefined, delBloqueo),
+      };
     } else {
       // El impacto se cuenta primero y todavía no cuesta nada: el número, y
       // con él la barra, llegan en el evento siguiente.
@@ -456,6 +488,8 @@ function turnoEnemigo(state: State, rng: Rng): State {
               s,
               daño > 0 ? `Lo bloqueás. Sólo −${daño}.` : "Lo bloqueás. No te toca.",
               "bueno",
+              undefined,
+              delBloqueo,
             ),
           };
         } else if (c.bloqueando) {
@@ -467,6 +501,8 @@ function turnoEnemigo(state: State, rng: Rng): State {
                 ? `Te cubrís y pasa igual. −${daño}.`
                 : `No llegás a bloquearlo. −${daño}.`,
               "malo",
+              undefined,
+              delBloqueo,
             ),
           };
         } else {
@@ -489,7 +525,10 @@ function turnoEnemigo(state: State, rng: Rng): State {
        * pasivo se iba a 22% contra 51% del luchador y bloquear volvía a ser la
        * respuesta a todo.
        */
-      s = { ...s, log: logEstado(s, "Lo bloqueás. No te llega a agarrar.", "bueno") };
+      s = {
+        ...s,
+        log: logEstado(s, "Lo bloqueás. No te llega a agarrar.", "bueno", undefined, delBloqueo),
+      };
     } else if (!acierta) {
       s = { ...s, log: logEstado(s, "Lo intenta y no te agarra.", "neutral") };
     } else {
@@ -503,7 +542,10 @@ function turnoEnemigo(state: State, rng: Rng): State {
             )
           : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) + 1 }],
       };
-      s = { ...s, log: logEstado(s, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef }) };
+      s = {
+        ...s,
+        log: logEstado(s, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef, ...delBloqueo }),
+      };
     }
   } else {
     // Un turno de espera igual es un turno: si no se muestra, el jugador ve
@@ -980,8 +1022,32 @@ function turnoDeCombate(
    * (`× factorMiedo`). Eso además es lo que la pantalla venía mostrando desde
    * siempre: un solo número, un solo resultado posible.
    */
-  if (accion !== "usar" && tieneEfecto(s, "miedo") && random(rng) < FALLA_POR_MIEDO) {
-    s = { ...s, log: log(s.log, "No te sale. Te quedás duro.", "malo") };
+  /*
+   * Y tampoco entra en BLOQUEAR, por una razón distinta: cubrirse no se
+   * resuelve cuando lo apretás sino cuando llega el golpe. Si el miedo lo
+   * cortara acá, esa tirada no tendría dónde mostrarse —el éxito no genera
+   * ningún evento, sólo te deja cubierto— y el reloj terminaría girando sobre
+   * una chance que nunca cae del lado bueno. El miedo del bloqueo se cobra
+   * adentro de su propia tirada, cuando el golpe llega.
+   */
+  if (
+    accion !== "usar" &&
+    accion !== "bloquear" &&
+    tieneEfecto(s, "miedo") &&
+    random(rng) < FALLA_POR_MIEDO
+  ) {
+    // La chance que se muestra es la de la acción entera, así que quedarse duro
+    // cae del lado del fracaso de esa misma tirada y no de una aparte.
+    const base =
+      accion === "atacar"
+        ? PRECISION_ATAQUE
+        : precisionArma(s, ref ?? s.jugador.armas[0] ?? "");
+    s = {
+      ...s,
+      log: log(s.log, "No te sale. Te quedás duro.", "malo", undefined, {
+        ...conTirada(s, Number.isFinite(base) ? base : 1, false),
+      }),
+    };
     return cerrarTurno(s, rng);
   }
 
@@ -990,7 +1056,16 @@ function turnoDeCombate(
   switch (accion) {
     case "atacar": {
       if (random(rng) > PRECISION_ATAQUE) {
-        s = { ...s, log: logEstado(s, "Tirás el brazo y no está donde creías.", "malo") };
+        s = {
+          ...s,
+          log: logEstado(
+            s,
+            "Tirás el brazo y no está donde creías.",
+            "malo",
+            undefined,
+            conTirada(s, PRECISION_ATAQUE, false),
+          ),
+        };
         break;
       }
       const doble = pasivos(s).primerGolpeDoble && !s.combate!.primerGolpeHecho;
@@ -1003,6 +1078,8 @@ function turnoDeCombate(
           s,
           doble ? `El primero entra entero. ${d}.` : `Le pegás. ${d}.`,
           doble ? "bueno" : "neutral",
+          undefined,
+          conTirada(s, PRECISION_ATAQUE, true),
         ),
       };
       break;
@@ -1017,8 +1094,14 @@ function turnoDeCombate(
       if (!armaId || !s.jugador.armas.includes(armaId)) return s;
       if (usosArma(s, armaId) <= 0) return s;
       const arma = ARMAS[armaId];
+      /*
+       * La precisión se lee antes de gastar el uso: el desgaste corre de este
+       * golpe en adelante, así que la chance que se muestra en el reloj es la
+       * misma que decía el botón cuando lo apretaste.
+       */
+      const punteria = precisionArma(s, armaId);
       // El uso se gasta aciertes o no. Y se recupera al salir del aula.
-      const acierta = random(rng) <= precisionArma(s, armaId);
+      const acierta = random(rng) <= punteria;
       const critico = acierta && random(rng) <= arma.critico;
 
       const dobleArma = pasivos(s).primerGolpeDoble && !s.combate!.primerGolpeHecho;
@@ -1036,7 +1119,16 @@ function turnoDeCombate(
 
       if (!acierta) {
         // Errar es errar: no se tira la pérdida porque no hubo golpe.
-        s = { ...s, log: logEstado(s, `${arma.nombre} pasa al lado.`, "malo") };
+        s = {
+          ...s,
+          log: logEstado(
+            s,
+            `${arma.nombre} pasa al lado.`,
+            "malo",
+            undefined,
+            conTirada(s, punteria, false),
+          ),
+        };
       } else {
         const mult = (critico ? 2 : 1) * (dobleArma ? 2 : 1);
         const d = aplicarDaño(s, arma.daño * mult);
@@ -1047,6 +1139,8 @@ function turnoDeCombate(
             s,
             critico ? `${arma.texto} Justo ahí. ${d}.` : `${arma.texto} ${d}.`,
             "bueno",
+            undefined,
+            conTirada(s, punteria, true),
           ),
         };
         // Recién ahora, y sólo porque entró, puede perderse en el rebote.
@@ -1106,7 +1200,16 @@ function turnoDeCombate(
           },
         };
         if (random(rng) > poder.precision * factorMiedo(s)) {
-          s = { ...s, log: logEstado(s, `${poder.nombre} no llega a agarrar.`, "malo") };
+          s = {
+            ...s,
+            log: logEstado(
+              s,
+              `${poder.nombre} no llega a agarrar.`,
+              "malo",
+              undefined,
+              conTirada(s, poder.precision, false),
+            ),
+          };
           return salirDeUsar(s, c, rng);
         }
         if (poder.efecto.daño) s = dañar(s, aplicarDaño(s, poder.efecto.daño));
@@ -1120,7 +1223,10 @@ function turnoDeCombate(
           };
         }
         if (poder.efecto.limpia) s = { ...s, efectos: [] };
-        s = { ...s, log: logEstado(s, `${poder.nombre}.`, "sueño") };
+        s = {
+          ...s,
+          log: logEstado(s, `${poder.nombre}.`, "sueño", undefined, conTirada(s, poder.precision, true)),
+        };
         return salirDeUsar(s, c, rng);
       }
 
@@ -1132,7 +1238,16 @@ function turnoDeCombate(
         jugador: { ...s.jugador, items: s.jugador.items.filter((_, k) => k !== idx) },
       };
       if (random(rng) > item.precision * factorMiedo(s)) {
-        s = { ...s, log: logEstado(s, `${item.nombre} se te escapa de la mano.`, "malo") };
+        s = {
+          ...s,
+          log: logEstado(
+            s,
+            `${item.nombre} se te escapa de la mano.`,
+            "malo",
+            undefined,
+            conTirada(s, item.precision, false),
+          ),
+        };
         return salirDeUsar(s, c, rng);
       }
       if (item.efecto.vida) {
@@ -1153,7 +1268,10 @@ function turnoDeCombate(
       if (item.efecto.sangria) {
         s = { ...s, combate: { ...s.combate!, sangria: item.efecto.sangria } };
       }
-      s = { ...s, log: logEstado(s, `Usás ${item.nombre}.`, "bueno") };
+      s = {
+        ...s,
+        log: logEstado(s, `Usás ${item.nombre}.`, "bueno", undefined, conTirada(s, item.precision, true)),
+      };
       return salirDeUsar(s, c, rng);
     }
   }

@@ -512,6 +512,34 @@ probable que otra cosa.
 
 Con la incierta en el reparto, las peleas ponderadas bajan de 70% a **68%**.
 
+### El reloj, y las dos mentiras que encontró
+
+La ruleta del combate obligó a que el motor dijera, por cada evento, **cuál fue
+la tirada y de qué lado cayó**. Eso permitió una prueba que antes no se podía
+escribir: agrupar miles de tiradas por el porcentaje que declaran y comparar con
+lo que salió de verdad.
+
+Encontró dos cosas que ya estaban rotas y que nadie podía ver:
+
+**1. El botón de BLOQUEAR mostraba 90% aunque tuvieras miedo.** El miedo se
+cobraba aparte, como un chequeo antes de la acción, así que tu chance real de
+cubrirte era 63% y la pantalla decía 90.
+
+**2. Y esa tirada del miedo sólo se anotaba cuando fallaba.** Cubrirse es la
+única acción que no se resuelve al apretarla: el éxito no genera ningún evento,
+sólo te deja cubierto. Así que el arco de 63% caía del lado bueno **el 4,9% de
+las veces**.
+
+El arreglo unifica: **una sola tirada, con el miedo adentro, resuelta cuando
+llega el golpe**. Es el mismo número en el botón y en el reloj, y da la misma
+probabilidad total que antes (0,7 × 0,9 = 0,63), así que el balance no se movió.
+
+**Nota sobre el umbral de la prueba.** La primera versión pedía 400 muestras y
+6% de margen, y el caso del bloqueo tenía 266 muestras: se escapaba por poco. El
+margen ahora se calcula —cuatro errores estándar de una binomial, con un piso
+para los grupos grandes— así que un grupo chico exige una desviación grande y
+uno grande detecta desviaciones finas. `RULETA=1` imprime todos los arcos.
+
 ## Cómo volver atrás
 
 Cada bloque de arriba tiene los valores viejos. Para recuperar un estado:

@@ -51,15 +51,33 @@ const RITMO = 780;
 const RITMO_TURNO = 1350;
 /** El aviso del enemigo: es lo único que hay que leer para decidir. */
 const RITMO_AVISO = 2000;
+/**
+ * Un evento que se resolvió con una tirada dura más: la aguja del reloj tiene
+ * que llegar a frenar y el resultado tiene que llegar a leerse después.
+ */
+const RITMO_TIRADA = 1750;
 
 /*
  * Los beats del umbral: la puerta, la luz subiendo, y lo que hay adentro
  * tomando forma. El aula vacía tiene un beat más —el objeto aparece después de
  * que ya viste que no hay nadie— y por eso hasta ese momento las tres clases de
  * aula tienen que verse exactamente igual.
+ *
+ * El primero es corto a propósito: la oscuridad no cuenta nada, sólo separa. Lo
+ * que hay que dejar respirar es la luz subiendo y la figura tomando forma.
  */
-const BEATS_UMBRAL = [850, 1500, 1400];
+const BEATS_UMBRAL = [420, 1350, 1400];
 const BEAT_PREMIO = 1700;
+
+/**
+ * Nada que tapó la pantalla se va de golpe.
+ *
+ * Es la regla que evita lo áspero: si algo entró despacio y sale en un frame,
+ * el corte se siente aunque lo de atrás sea correcto. Todo lo que cubre —el
+ * umbral, la historia de la entrada— se apaga con este fundido antes de
+ * desmontarse.
+ */
+const FUNDIDO = 620;
 
 const SIN_LOG: Entrada[] = [];
 
@@ -78,12 +96,20 @@ export default function Juego() {
    * leído.
    */
   const [umbral, setUmbral] = useState<DatoUmbral | null>(null);
+  /** El texto de la entrada, entre apretar ENTRAR y estar en el pasillo. */
+  const [historia, setContandoHistoria] = useState(false);
   // La secuencia también vive acá: el golpe que mata cambia de pantalla, y
   // esas líneas tienen que terminar de verse igual.
   const { actual, contando, restantes } = useSecuencia(
     state?.log ?? SIN_LOG,
-    umbral !== null,
+    umbral !== null || historia,
   );
+
+  const empezar = () => {
+    pos.current = null;
+    setState(initialState());
+    setContandoHistoria(true);
+  };
   /*
    * El aula no se abandona en medio de una secuencia.
    *
@@ -122,16 +148,7 @@ export default function Juego() {
     setState(siguiente);
   };
 
-  if (!state) {
-    return (
-      <Portada
-        onStart={() => {
-          pos.current = null;
-          setState(initialState());
-        }}
-      />
-    );
-  }
+  if (!state) return <Portada onStart={empezar} />;
 
   if (state.ciclo !== cicloAnterior.current) {
     cicloAnterior.current = state.ciclo;
@@ -147,6 +164,9 @@ export default function Juego() {
   const puerta = umbral ? (
     <Umbral dato={umbral} onFin={() => setUmbral(null)} />
   ) : null;
+  const entrada = historia ? (
+    <Historia onFin={() => setContandoHistoria(false)} />
+  ) : null;
 
   // Huir también cierra el aula, y su línea también hay que verla.
   if (state.fase === "pasillo" && state.mundo && !congelado) {
@@ -154,6 +174,7 @@ export default function Juego() {
       <>
         {evento}
         {inventario}
+        {entrada}
         <Pasillo
           onInventario={() => setVerInventario(true)}
           state={state}
@@ -170,6 +191,7 @@ export default function Juego() {
       {evento}
       {inventario}
       {puerta}
+      {entrada}
       {/*
         El combate entra entero en la pantalla y no se scrollea: mirar para
         abajo en medio de un turno es perder el hilo de lo que está pasando.
@@ -201,6 +223,12 @@ export default function Juego() {
             restantes={restantes}
           />
         )}
+        {/*
+          Las pantallas que no son el combate entran con un fundido corto.
+          Ganar una pelea te lleva a la recompensa en el mismo despacho, y ese
+          salto era lo único seco que quedaba después de un turno entero de
+          cosas graduales — que es justo donde más se nota.
+        */}
         {!congelado && state.fase === "juego" && state.minijuego && (
           <Juegito juego={state.minijuego} dispatch={dispatch} />
         )}
@@ -211,13 +239,7 @@ export default function Juego() {
           <Sueño state={state} dispatch={dispatch} />
         )}
         {!congelado && (state.fase === "muerto" || state.fase === "fin") && (
-          <Final
-            state={state}
-            onRestart={() => {
-              pos.current = null;
-              setState(initialState());
-            }}
-          />
+          <Final state={state} onRestart={empezar} />
         )}
       </main>
     </>
@@ -226,17 +248,19 @@ export default function Juego() {
 
 // --- portada --------------------------------------------------------------
 
+/**
+ * La portada no cuenta nada. Antes tenía las dos líneas de la premisa acá
+ * arriba, compitiendo con el título y con el botón: el que quiere jugar las
+ * saltea y el que quiere leerlas las lee mientras mira un botón. Ahora la
+ * historia vive donde se puede escuchar —entre apretar ENTRAR y llegar al
+ * pasillo— y acá queda sólo el nombre y una cosa que respira.
+ */
 function Portada({ onStart }: { onStart: () => void }) {
   return (
-    <main className="grano mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-10 px-6 py-24">
-      <div className="space-y-5 text-center">
-        <h1 className="text-7xl font-bold tracking-[0.08em] text-agua drop-shadow-[0_0_28px_rgba(63,217,196,0.35)]">VIGILIA</h1>
-        <p className="text-base leading-relaxed text-dim">
-          Hace tres días que no dormís bien.
-          <br />
-          Ya no estás seguro de cuál de los dos mundos te espera despierto.
-        </p>
-      </div>
+    <main className="grano mx-auto flex w-full max-w-xl flex-1 flex-col items-center justify-center gap-12 px-6 py-24">
+      <h1 className="text-7xl font-bold tracking-[0.08em] text-agua drop-shadow-[0_0_28px_rgba(63,217,196,0.35)]">
+        VIGILIA
+      </h1>
       <EnPie materiaId="biologia" clase="respira" />
       <button
         onClick={onStart}
@@ -245,6 +269,86 @@ function Portada({ onStart }: { onStart: () => void }) {
         ENTRAR
       </button>
     </main>
+  );
+}
+
+/*
+ * Las líneas de la entrada. Cortas y de a una: lo que hace que se lean es que
+ * no haya nada más en la pantalla mientras están.
+ */
+const HISTORIA = [
+  "Hace tres días que no dormís.",
+  "El colegio abre a las siete.",
+  "Ya no estás seguro de cuál de los dos mundos te espera despierto.",
+];
+/** Cuánto queda cada línea sola antes de que entre la siguiente. */
+const BEAT_HISTORIA = 2300;
+
+/**
+ * El pasaje entre apretar ENTRAR y estar caminando el pasillo.
+ *
+ * Las líneas entran de a una y las anteriores se apagan sin irse, así que lo
+ * que se lee último queda apoyado sobre lo que se leyó antes. Al final la
+ * pantalla se va en negro y recién ahí aparece el pasillo: cortar de una línea
+ * de texto directo al canvas es el salto que hay que evitar.
+ */
+function Historia({ onFin }: { onFin: () => void }) {
+  const [linea, setLinea] = useState(0);
+  const [saliendo, setSaliendo] = useState(false);
+  const fin = useRef(onFin);
+  fin.current = onFin;
+
+  useEffect(() => {
+    if (linea < HISTORIA.length) {
+      const t = setTimeout(() => setLinea((l) => l + 1), BEAT_HISTORIA);
+      return () => clearTimeout(t);
+    }
+    // El último respiro con todo puesto, y después el fundido.
+    const t = setTimeout(() => setSaliendo(true), 900);
+    return () => clearTimeout(t);
+  }, [linea]);
+
+  useEffect(() => {
+    if (!saliendo) return;
+    const t = setTimeout(() => fin.current(), FUNDIDO);
+    return () => clearTimeout(t);
+  }, [saliendo]);
+
+  useEffect(() => {
+    const saltar = (e: KeyboardEvent | Event) => {
+      if ("repeat" in e && (e as KeyboardEvent).repeat) return;
+      setSaliendo(true);
+    };
+    window.addEventListener("keydown", saltar);
+    window.addEventListener("pointerdown", saltar);
+    return () => {
+      window.removeEventListener("keydown", saltar);
+      window.removeEventListener("pointerdown", saltar);
+    };
+  }, []);
+
+  return (
+    <div
+      className={`fixed inset-0 z-[55] flex flex-col items-center justify-center gap-6 bg-background px-10 transition-opacity ease-in ${
+        saliendo ? "opacity-0" : "opacity-100"
+      }`}
+      style={{ transitionDuration: `${FUNDIDO}ms` }}
+    >
+      {HISTORIA.map((t, i) => (
+        <p
+          key={t}
+          className={`max-w-md text-center text-lg leading-relaxed transition-all duration-1000 ${
+            i > linea
+              ? "translate-y-1 opacity-0"
+              : i === linea
+                ? "text-foreground opacity-100"
+                : "text-dim opacity-45"
+          }`}
+        >
+          {t}
+        </p>
+      ))}
+    </div>
   );
 }
 
@@ -750,6 +854,7 @@ function leerUmbral(s: State, p: Puerta): DatoUmbral {
  */
 function Umbral({ dato, onFin }: { dato: DatoUmbral; onFin: () => void }) {
   const [paso, setPaso] = useState(0);
+  const [saliendo, setSaliendo] = useState(false);
   const beats =
     dato.que === "bendicion" && dato.itemId ? [...BEATS_UMBRAL, BEAT_PREMIO] : BEATS_UMBRAL;
   // Por ref, para que volver a pintar no reinicie el reloj del beat en curso.
@@ -758,12 +863,23 @@ function Umbral({ dato, onFin }: { dato: DatoUmbral; onFin: () => void }) {
 
   useEffect(() => {
     if (paso >= beats.length) {
-      fin.current();
+      setSaliendo(true);
       return;
     }
     const t = setTimeout(() => setPaso((p) => p + 1), beats[paso]);
     return () => clearTimeout(t);
   }, [paso, beats.length]);
+
+  /*
+   * El aula no aparece de un frame al otro. Antes el umbral se desmontaba en
+   * cuanto terminaba el último beat y el corte se sentía justo después de tres
+   * segundos de todo gradual, que es donde más se nota.
+   */
+  useEffect(() => {
+    if (!saliendo) return;
+    const t = setTimeout(() => fin.current(), FUNDIDO);
+    return () => clearTimeout(t);
+  }, [saliendo]);
 
   useEffect(() => {
     // `repeat` es el auto-repeat de una tecla que quedó apretada: si venías
@@ -790,7 +906,12 @@ function Umbral({ dato, onFin }: { dato: DatoUmbral; onFin: () => void }) {
   const luz = profe ? "rgba(226,104,92,0.18)" : "rgba(63,217,196,0.16)";
 
   return (
-    <div className="fixed inset-0 z-[55] flex flex-col items-center justify-center gap-7 overflow-hidden bg-background px-8">
+    <div
+      className={`fixed inset-0 z-[55] flex flex-col items-center justify-center gap-7 overflow-hidden bg-background px-8 transition-opacity ease-in ${
+        saliendo ? "opacity-0" : "opacity-100"
+      }`}
+      style={{ transitionDuration: `${FUNDIDO}ms` }}
+    >
       {/* La luz del aula subiendo. Es la misma en las tres: no puede delatar. */}
       {paso >= 1 && (
         <div
@@ -1211,6 +1332,8 @@ function useSecuencia(log: Entrada[], pausado = false) {
       cronologico.map((entrada, k) => {
         // El aviso manda: es lo que el jugador tiene que leer para decidir.
         if (entrada.aviso) return { entrada, dura: RITMO_AVISO };
+        // Y si hubo tirada, el reloj tiene que llegar a frenar.
+        if (entrada.tirada) return { entrada, dura: RITMO_TIRADA };
         // El último evento de una mano se queda más tiempo: ese silencio es
         // el turno pasando de un lado al otro.
         const siguiente = cronologico[k + 1];
@@ -1260,7 +1383,10 @@ function useSecuencia(log: Entrada[], pausado = false) {
 function EventoEfecto({ entrada, k }: { entrada: Entrada; k: number }) {
   if (!entrada.icono) return null;
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-background/80 px-8">
+    <div
+      key={`fondo-${k}-${entrada.texto}`}
+      className="pasa-por-encima fixed inset-0 z-40 flex items-center justify-center bg-background/80 px-8"
+    >
       <div
         key={`${k}-${entrada.texto}`}
         className="aparece flex max-w-sm flex-col items-center gap-4 text-center"
@@ -1317,15 +1443,123 @@ function EventoEnLinea({
       >
         {entrada.aviso ? "SE DECIDE" : mio ? "▸ VOS" : "ESO ◂"}
       </span>
+      {/*
+        Si hubo tirada, el texto espera a que la aguja pare. Mostrar el
+        resultado escrito mientras el reloj todavía gira vacía el giro: ya
+        sabrías cómo terminó antes de que termine.
+      */}
       <p
         className={`text-base leading-snug ${
           entrada.aviso && ciego ? "text-sueno" : COLOR_FUERTE[entrada.tipo]
-        }`}
+        } ${entrada.tirada ? "espera-la-aguja" : ""}`}
       >
         {entrada.aviso && ciego ? "Se decide, pero no llegás a ver qué." : entrada.texto}
       </p>
       {/* El número va pegado abajo del texto que lo describe en abstracto. */}
       {entrada.aviso && numeros && <p className="text-sm text-dim">{numeros}</p>}
+    </div>
+  );
+}
+
+// --- el reloj del aula ----------------------------------------------------
+
+/** Cuánto tarda la aguja en frenar. */
+const GIRO = 1050;
+
+/**
+ * El reloj del aula: la ruleta donde se ve ocurrir el azar.
+ *
+ * Todo lo que podés hacer tiene una chance declarada, y hasta ahora esa chance
+ * se resolvía en silencio y aparecía ya cocinada en una línea de texto. Acá la
+ * aguja gira sobre el mismo arco que el botón venía mostrando y cae del lado
+ * que efectivamente tocó: el número deja de ser una promesa y pasa a ser algo
+ * que mirás pasar.
+ *
+ * La aguja **nunca vuelve para atrás** y **nunca cae sobre la línea** que
+ * separa los dos arcos. Lo primero porque un reloj que retrocede se lee como
+ * un error; lo segundo porque ahí no se sabría de qué lado cayó.
+ *
+ * Queda colgado aunque no haya nada que tirar, apagado y con la aguja donde
+ * paró la última vez. Es parte del aula, no un cartel que aparece.
+ */
+function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
+  const [angulo, setAngulo] = useState(0);
+  /*
+   * El arco se queda puesto después de que el evento pasó y se apaga con un
+   * fundido. Si el color se fuera en el mismo frame en que cambia el evento,
+   * un segundo entero de aguja frenando terminaría en un corte.
+   */
+  const [ultimo, setUltimo] = useState<Entrada["tirada"] | undefined>(undefined);
+  const acumulado = useRef(0);
+  const vista = useRef<Entrada["tirada"] | undefined>(undefined);
+
+  useEffect(() => {
+    if (!tirada || tirada === vista.current) return;
+    vista.current = tirada;
+    setUltimo(tirada);
+    const arco = (tirada.prob / 100) * 360;
+    // Un margen para que la aguja no quede parada justo sobre el límite: ahí
+    // no se leería de qué lado cayó.
+    const m = Math.min(7, Math.max(arco, 360 - arco) / 6);
+    const destino = tirada.salio
+      ? m + Math.random() * Math.max(1, arco - m * 2)
+      : arco + m + Math.random() * Math.max(1, 360 - arco - m * 2);
+    // Siempre para adelante: vueltas enteras sobre lo ya acumulado. Una aguja
+    // que retrocede se lee como un error, no como suspenso.
+    const desde = ((acumulado.current % 360) + 360) % 360;
+    acumulado.current += 3 * 360 + ((destino - desde + 360) % 360);
+    setAngulo(acumulado.current);
+  }, [tirada]);
+
+  const activo = !!tirada;
+  const arco = ultimo ? (ultimo.prob / 100) * 360 : 0;
+
+  return (
+    <div className="flex flex-col items-center gap-1">
+      <div className="relative h-16 w-16">
+        {/* La esfera apagada, que es lo que se ve cuando no hay nada que tirar. */}
+        <div className="absolute inset-0 rounded-full border border-borde bg-borde-suave" />
+        {/* Y encima el arco de la tirada, que entra y sale con un fundido. */}
+        <div
+          className="absolute inset-0 rounded-full transition-opacity duration-700"
+          style={{
+            background: `conic-gradient(var(--agua) 0deg ${arco}deg, var(--malo) ${arco}deg 360deg)`,
+            opacity: activo ? 1 : 0,
+          }}
+        />
+        {/* El centro apagado convierte el disco en un anillo. */}
+        <div className="absolute inset-[6px] rounded-full bg-background" />
+        {/* Las doce marcas, para que se lea como un reloj y no como un gráfico. */}
+        {Array.from({ length: 12 }, (_, i) => (
+          <div
+            key={i}
+            className="absolute left-1/2 top-[5px] h-1.5 w-px bg-dim/40"
+            style={{
+              transformOrigin: "50% 27px",
+              transform: `translateX(-50%) rotate(${i * 30}deg)`,
+            }}
+          />
+        ))}
+        <div
+          className="absolute bottom-1/2 left-1/2 h-[21px] w-[2px] transition-colors duration-700"
+          style={{
+            transformOrigin: "bottom center",
+            transform: `translateX(-50%) rotate(${angulo}deg)`,
+            background: activo ? "var(--foreground)" : "var(--dim)",
+            // Arranca de golpe y frena largo: con una desaceleración corta el
+            // final se sentiría como un tirón.
+            transition: `transform ${GIRO}ms cubic-bezier(0.1, 0.72, 0.16, 1), background 700ms`,
+          }}
+        />
+        <div className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" />
+      </div>
+      <span
+        className={`text-xs tabular-nums transition-opacity duration-700 ${
+          activo ? "text-dim opacity-100" : "opacity-0"
+        }`}
+      >
+        {ultimo ? `${ultimo.prob}%` : ""}
+      </span>
     </div>
   );
 }
@@ -1432,12 +1666,16 @@ function Combate({
 
       <div
         key={`herido-${herido}`}
-        className={`flex min-h-0 flex-1 flex-col items-center justify-center gap-2 border p-4 ${
+        className={`relative flex min-h-0 flex-1 flex-col items-center justify-center gap-2 border p-4 ${
           enemigo.profesor
             ? "border-malo bg-[radial-gradient(ellipse_at_center,rgba(226,104,92,0.09),transparent_70%)]"
             : "border-borde bg-[radial-gradient(ellipse_at_center,rgba(63,217,196,0.05),transparent_70%)]"
         } ${herido > 0 ? "sacude" : ""}`}
       >
+        {/* El reloj está colgado en la pared del aula, a un costado. */}
+        <div className="absolute right-3 top-3">
+          <Reloj tirada={actual?.tirada} />
+        </div>
         <div key={`golpe-${golpe}`} className={golpe > 0 ? "sacude" : "respira"}>
           <EnPie materiaId={c.materiaId} />
         </div>
@@ -1500,7 +1738,7 @@ function Combate({
         <Boton
           label="BLOQUEAR"
           icono={ICONOS_ACCION.bloquear}
-          sub={`para todo y devolvés ${bloqueoDe(state).daño} · ${Math.round(bloqueoDe(state).precision * 100)}%`}
+          sub={`para todo y devolvés ${bloqueoDe(state).daño} · ${pct(bloqueoDe(state).precision)}%`}
           onClick={() => act("bloquear")}
         />
         <Boton
@@ -1676,7 +1914,7 @@ function Juegito({
   const elegir = (i: number) => dispatch({ type: "juego", eleccion: i });
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col justify-center gap-6 border border-oro p-6">
+    <section className="entra-pantalla flex min-h-0 flex-1 flex-col justify-center gap-6 border border-oro p-6">
       <p className="text-sm tracking-[0.3em] text-oro">
         {juego.tipo === "pizarron"
           ? "EL PIZARRÓN"
@@ -1779,7 +2017,7 @@ function Recompensa({
 }) {
   const nueva = state.armaOfrecida;
   return (
-    <section className="flex min-h-0 flex-1 flex-col gap-3 border border-agua-hondo p-4">
+    <section className="entra-pantalla flex min-h-0 flex-1 flex-col gap-3 border border-agua-hondo p-4">
       {state.caido && (
         <div className="flex shrink-0 flex-col items-center gap-2 border-b border-borde-suave pb-3">
           <EnPie materiaId={state.caido.materiaId} muriendo />
@@ -1864,7 +2102,7 @@ function Recompensa({
 
 function Sueño({ state, dispatch }: { state: State; dispatch: (a: Action) => void }) {
   return (
-    <section className="-mx-5 -my-8 min-h-screen bg-[#e8eeeb] px-6 py-12 text-[#1a2b28]">
+    <section className="entra-pantalla -mx-5 -my-8 min-h-screen bg-[#e8eeeb] px-6 py-12 text-[#1a2b28]">
       <div className="mx-auto max-w-xl space-y-8">
         <div className="space-y-2 text-center">
           <p className="text-sm tracking-[0.3em] text-[#4a625d]">POR FIN</p>
@@ -1908,7 +2146,7 @@ function Sueño({ state, dispatch }: { state: State; dispatch: (a: Action) => vo
 function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
   const muerto = state.fase === "muerto";
   return (
-    <section className={`space-y-5 border p-6 ${muerto ? "border-malo" : "border-agua"}`}>
+    <section className={`entra-pantalla space-y-5 border p-6 ${muerto ? "border-malo" : "border-agua"}`}>
       <p className={`text-sm tracking-widest ${muerto ? "text-malo" : "text-agua"}`}>
         {muerto ? "NO SONÓ NINGÚN TIMBRE" : "SALISTE"}
       </p>

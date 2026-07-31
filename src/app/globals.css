@@ -223,6 +223,69 @@ body {
 }
 
 /*
+ * El estado que te agarra tapa la pantalla, y tapar la pantalla es lo bastante
+ * fuerte como para que no pueda irse en un frame. Entra, se queda, y se va —
+ * las tres cosas dentro del rato que dura el evento.
+ */
+@keyframes pasar-por-encima {
+  0% {
+    opacity: 0;
+  }
+  16% {
+    opacity: 1;
+  }
+  78% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+.pasa-por-encima {
+  animation: pasar-por-encima 0.78s ease-in-out forwards;
+}
+
+/*
+ * Y una pantalla nueva tampoco aparece de un frame al otro. Es el fundido más
+ * corto de todos porque es el más frecuente: lo suficiente para que el cambio
+ * no se sienta como un corte, no tanto como para hacerse esperar.
+ */
+@keyframes entrar-pantalla {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.entra-pantalla {
+  animation: entrar-pantalla 0.42s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/*
+ * Cuando hubo tirada, el resultado escrito espera a que la aguja pare. Si el
+ * texto llegara mientras el reloj todavía gira, el giro no serviría de nada:
+ * ya sabrías cómo terminó antes de que termine. El 78% del recorrido es
+ * lo que tarda la aguja en frenar.
+ */
+@keyframes esperar-aguja {
+  0%,
+  78% {
+    opacity: 0;
+    transform: translateY(3px);
+  }
+  100% {
+    opacity: 1;
+    transform: none;
+  }
+}
+.espera-la-aguja {
+  animation: esperar-aguja 1.45s ease-out forwards;
+}
+
+/*
  * EL UMBRAL. Abrir una puerta no muestra el aula de golpe: la luz sube sola y
  * lo que hay adentro toma forma después. El suspenso no está en lo que hay
  * adentro sino en el rato en que todavía no sabés qué hay, así que las tres

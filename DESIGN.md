@@ -59,8 +59,20 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 16 invariantes automáticas y 43 comprobaciones de números
+Verificado con 18 invariantes automáticas y 43 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
+
+## Nada aparece de un frame al otro
+
+Es la regla que ordena todo lo visual. Si algo entró despacio y sale en un
+frame, el corte se siente aunque lo que quede atrás sea correcto — y se siente
+más fuerte justamente después de un rato de todo gradual, que es donde el ojo ya
+se acostumbró a que las cosas tomen su tiempo.
+
+Así que todo lo que tapa la pantalla se apaga con un fundido antes de irse: el
+umbral, el texto de la entrada, el estado que te agarra. Y toda pantalla nueva
+entra con uno corto, porque ganar una pelea te lleva a la recompensa en el mismo
+despacho y ese salto era lo único seco que quedaba en el turno.
 
 ## El umbral
 
@@ -213,6 +225,35 @@ terminó de contarse.
 **Cada profesor vencido suma +40% de daño a todo lo que hacés.** Sin eso los
 enemigos escalan por ciclo y tus números se quedan atrás: sin progresión, todos
 los estilos mueren el 85-91% de las veces.
+
+### El reloj del aula
+
+Todo lo que podés hacer tiene una chance declarada, y hasta ahora esa chance se
+resolvía en silencio y aparecía ya cocinada en una línea de texto. Ahora hay un
+**reloj colgado en la pared del aula**: la aguja gira sobre el mismo arco que el
+botón venía mostrando y cae del lado que tocó.
+
+El número deja de ser una promesa y pasa a ser algo que mirás pasar. Es la misma
+regla de siempre —el azar declarado es una apuesta que tomó el jugador, el azar
+escondido se siente tramposo— llevada un paso más: ahora también se ve ocurrir.
+
+Tres reglas lo sostienen:
+
+- **La aguja nunca vuelve para atrás.** Un reloj que retrocede se lee como un
+  error, no como suspenso.
+- **Nunca cae sobre la línea** que separa los dos arcos, donde no se sabría de
+  qué lado cayó.
+- **El resultado escrito espera a que la aguja pare.** Si el texto llegara antes,
+  el giro no serviría de nada.
+
+Gira para lo que hacés vos: atacar, el arma, el item, el poder. Y para el
+bloqueo, que es la más tensa de todas porque no se resuelve cuando la apretás
+sino **cuando el golpe llega**.
+
+Verificado con una prueba que agrupa miles de tiradas por el porcentaje que
+declaran y compara con lo que salió de verdad. **Un arco que dice 63% tiene que
+caer del lado bueno el 63% de las veces**, y si no, el reloj miente. Ya agarró
+dos mentiras que estaban en el motor desde antes.
 
 **El enemigo siempre telegrafía lo que va a hacer el turno siguiente.** Todo el
 combate es leer ese aviso y decidir si pegás o te cubrís. Cubrirte en el momento
