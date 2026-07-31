@@ -75,10 +75,14 @@ export type Arma = {
   texto: string;
 };
 
+/** Cuanto más raro, mejor el item y menos seguido aparece. */
+export type Rareza = "comun" | "raro" | "unico";
+
 export type Item = {
   id: string;
   nombre: string;
   descripcion: string;
+  rareza: Rareza;
   precision: number;
   efecto: {
     vida?: number;

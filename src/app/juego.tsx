@@ -820,7 +820,8 @@ function numerosDe(i: Intencion): string {
     return i.imparable ? `${base} · NO SE PUEDE BLOQUEAR` : base;
   }
   if (i.tipo === "efecto") {
-    return `te deja ${(NOMBRE_EFECTO[i.efecto ?? ""] ?? "").toLowerCase()} · ${prob}`;
+    const base = `te deja ${(NOMBRE_EFECTO[i.efecto ?? ""] ?? "").toLowerCase()} · ${prob}`;
+    return i.imparable ? `${base} · NO SE PUEDE BLOQUEAR` : base;
   }
   return "no hace nada este turno";
 }
@@ -935,7 +936,7 @@ function Combate({
       ref: id,
       key: `i${i}`,
       texto: `${ITEMS[id].nombre} · ${pct(ITEMS[id].precision)}% — ${ITEMS[id].descripcion}`,
-      clase: "text-dim",
+      clase: COLOR_RAREZA[ITEMS[id].rareza],
     })),
     ...j.sombras.map((id, i) => ({
       ref: `sombra:${id}`,
@@ -1033,7 +1034,7 @@ function Combate({
         />
         <Boton
           label="BLOQUEAR"
-          sub={`para el golpe y devolvés ${bloqueoDe(state).daño} · ${Math.round(bloqueoDe(state).precision * 100)}%`}
+          sub={`para todo y devolvés ${bloqueoDe(state).daño} · ${Math.round(bloqueoDe(state).precision * 100)}%`}
           onClick={() => act("bloquear")}
         />
         <Boton
@@ -1044,7 +1045,7 @@ function Combate({
         />
         <Boton
           label="USAR"
-          sub={`${guardado.length}`}
+          sub={`${guardado.length} · no gasta turno`}
           disabled={guardado.length === 0}
           onClick={() => setMenu(menu === "usar" ? null : "usar")}
         />
@@ -1124,9 +1125,9 @@ function describirBotin(b: State["botin"][number]): {
     case "item": {
       const it = ITEMS[b.id];
       return {
-        nombre: it.nombre,
+        nombre: `${it.nombre} (${NOMBRE_RAREZA[it.rareza]})`,
         que: it.descripcion,
-        como: `Se usa desde USAR durante un combate. Se gasta para siempre: acierta ${Math.round(it.precision * 100)} de cada 100 veces.`,
+        como: `Se usa desde USAR y no gasta el turno. Se gasta para siempre: acierta ${Math.round(it.precision * 100)} de cada 100 veces.`,
       };
     }
     case "arma": {
@@ -1320,6 +1321,18 @@ function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
     </section>
   );
 }
+
+/** La rareza se lee de un vistazo por el color. */
+const COLOR_RAREZA: Record<string, string> = {
+  comun: "text-dim",
+  raro: "text-agua",
+  unico: "text-sueno",
+};
+const NOMBRE_RAREZA: Record<string, string> = {
+  comun: "común",
+  raro: "raro",
+  unico: "único",
+};
 
 const COLOR = {
   neutral: "text-dim",

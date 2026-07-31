@@ -9,10 +9,27 @@
  * dispara eventos discretos (entrar a un aula). El reducer no sabe de píxeles.
  */
 
-import { ARMAS, ENEMIGOS, ITEMS, ITEM_IDS, MATERIAS, MATERIA_IDS, nombreMateria } from "./content";
+import {
+  ARMAS,
+  ENEMIGOS,
+  ITEMS,
+  ITEM_IDS,
+  MATERIAS,
+  MATERIA_IDS,
+  PESO_RAREZA,
+  nombreMateria,
+} from "./content";
 import { generarPasillo, type Mundo } from "./mundo";
 import { DEFECTOS, DEFECTO_IDS, PODERES, PODER_IDS } from "./poderes";
-import { makeRng, pick, pickMany, random, randomSeed, type Rng } from "./rng";
+import {
+  makeRng,
+  pick,
+  pickMany,
+  pickWeighted,
+  random,
+  randomSeed,
+  type Rng,
+} from "./rng";
 import type {
   Accion,
   Action,
@@ -40,15 +57,20 @@ export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 6);
  * Lo que devuelve un bloqueo: la mitad de un golpe a mano limpia. Nunca puede
  * superar a atacar, o no habría razón para atacar cuando ves venir un golpe.
  */
-export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 3);
+export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 5);
 /**
  * Cuánto del golpe pasa igual cuando bloqueás bien. No es cero a propósito:
  * si bloquear anulara todo, no existiría la opción de correr a matarlo antes
  * de que llegue a pegarte.
  */
-export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0.4);
+/**
+ * Un bloqueo que sale para el golpe entero. Lo que hace que bloquear no sea
+ * siempre la respuesta no es que deje pasar algo, sino que hay golpes
+ * imparables y que bloquear no hace daño.
+ */
+export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0);
 /** Perilla global del daño enemigo. Se afina midiendo, no a ojo. */
-const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.25);
+const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.4);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -431,7 +453,10 @@ function turnoEnemigo(state: State, rng: Rng): State {
       }
     }
   } else if (intencion.tipo === "efecto" && intencion.efecto) {
-    if (!acierta) {
+    if (bloqueaBien) {
+      // Cubrirse también sirve contra lo que te quiere dejar algo encima.
+      s = { ...s, log: logEstado(s, "Lo bloqueás. No te llega a agarrar.", "bueno") };
+    } else if (!acierta) {
       s = { ...s, log: logEstado(s, "Lo intenta y no te agarra.", "neutral") };
     } else {
       const ef = intencion.efecto;
@@ -439,8 +464,10 @@ function turnoEnemigo(state: State, rng: Rng): State {
       s = {
         ...s,
         efectos: ya
-          ? s.efectos.map((x) => (x.efecto === ef ? { ...x, turnos: duracionEfecto(s) } : x))
-          : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) }],
+          ? s.efectos.map((x) =>
+              x.efecto === ef ? { ...x, turnos: duracionEfecto(s) + 1 } : x,
+            )
+          : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) + 1 }],
       };
       s = { ...s, log: logEstado(s, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef }) };
     }
@@ -572,7 +599,11 @@ function ganarCombate(state: State, rng: Rng): State {
   } else if (jugador.items.length < 6) {
     // Cada materia da siempre lo suyo: por eso se puede aprender qué esperar.
     const cuantos = random(rng) < 0.25 ? 2 : 1;
-    const itemId = pick(rng, materia?.items ?? ITEM_IDS);
+    const candidatos = materia?.items ?? ITEM_IDS;
+    const itemId = pickWeighted(
+      rng,
+      candidatos.map((id) => ({ item: id, weight: PESO_RAREZA[ITEMS[id].rareza] })),
+    );
     const caben = Math.min(cuantos, 6 - jugador.items.length);
     jugador = { ...jugador, items: [...jugador.items, ...Array(caben).fill(itemId)] };
     botin.push({ tipo: "item", id: itemId, cantidad: caben });
@@ -941,8 +972,9 @@ function turnoDeCombate(
         break;
       }
 
-      // Los items se consumen para siempre: guardarlos o quemarlos ahora es
-      // media estrategia del juego.
+      // Los items se consumen para siempre, pero NO gastan el turno: usarlos
+      // es gratis en tiempo y caro en recursos. Eso los vuelve una decisión
+      // de "cuándo lo quemo" y no de "vale la pena perder un turno".
       const idx = s.jugador.items.indexOf(ref);
       if (idx === -1) return s;
       const item = ITEMS[ref];
@@ -952,7 +984,7 @@ function turnoDeCombate(
       };
       if (random(rng) > item.precision) {
         s = { ...s, log: logEstado(s, `${item.nombre} se te escapa de la mano.`, "malo") };
-        break;
+        return { ...s, combate: { ...s.combate!, bloqueando: c.bloqueando } };
       }
       if (item.efecto.vida) {
         s = {
@@ -973,7 +1005,9 @@ function turnoDeCombate(
         s = { ...s, combate: { ...s.combate!, sangria: item.efecto.sangria } };
       }
       s = { ...s, log: logEstado(s, `Usás ${item.nombre}.`, "bueno") };
-      break;
+      // Sale sin pasar por el turno del enemigo.
+      if (s.combate!.vida <= 0) return ganarCombate(s, rng);
+      return { ...s, combate: { ...s.combate!, bloqueando: c.bloqueando } };
     }
   }
 

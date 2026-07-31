@@ -5,8 +5,17 @@ están. Sirve para volver atrás: cada cambio grande queda anotado con la
 medición de antes y de después, así se puede recuperar un estado anterior aunque
 el código ya no exista.
 
-**Todas las cifras salen de bots simulando miles de partidas.** Los scripts no
-están versionados; se reconstruyen desde las descripciones de acá.
+**Todas las cifras salen de bots simulando miles de partidas.** El banco vive
+en `scripts/balance.ts`:
+
+```
+npx tsx scripts/balance.ts            estilos + invariantes
+npx tsx scripts/balance.ts estilos    sólo el balance
+CORRIDAS=5000 npx tsx scripts/balance.ts   más corridas, menos ruido
+```
+
+Los bots juegan sólo con lo que la pantalla muestra: si un defecto tapa el
+aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 
 ---
 
@@ -15,10 +24,10 @@ están versionados; se reconstruyen desde las descripciones de acá.
 | Perilla | Valor | Dónde | Qué toca |
 |---|---|---|---|
 | `DAÑO_ATAQUE` | **6** | `engine.ts` | Golpe a mano limpia |
-| `DAÑO_CONTRA` | **3** | `engine.ts` | Lo que devuelve un bloqueo que salió |
+| `DAÑO_CONTRA` | **5** | `engine.ts` | Lo que devuelve un bloqueo que salió |
 | `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
-| `PASA_BLOQUEANDO` | **0.40** | `engine.ts` | Del golpe que igual entra bloqueando |
-| `MULT_ENEMIGO` | **1.25** | `engine.ts` | Perilla global del daño enemigo |
+| `PASA_BLOQUEANDO` | **0** | `engine.ts` | Un bloqueo que sale no deja pasar nada |
+| `MULT_ENEMIGO` | **1.40** | `engine.ts` | Perilla global del daño enemigo |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.92** | `engine.ts` | Puntería del golpe a mano limpia |
 | `FALLA_POR_MIEDO` | **0.30** | `engine.ts` | Chance de que una acción no salga con miedo |
@@ -45,28 +54,18 @@ distintas de jugar caigan en una banda parecida**, y que las degeneradas
 
 ### Medición actual
 
-**Estilos de combate** — cómo decidís turno a turno:
+| Estilo | Muertes | Ciclo |
+|---|---|---|
+| Calculador: decide turno a turno | **48,8%** | 3,6 |
+| Guarda los items para el profesor | 51,9% | 3,5 |
+| Media pasada del pasillo | 56,0% | 3,3 |
+| Pasivo: bloquea siempre que sirve | 56,9% | 3,3 |
+| Luchador: nunca bloquea | 60,3% | 2,9 |
+| A lo bruto: el arma que más pegue | 60,9% | 2,9 |
+| **Derecho al profesor** | **95,6%** | 1,9 |
 
-| Estilo | Muertes |
-|---|---|
-| Calculador: bloquea, salvo que pueda matarlo antes del golpe | 50,4% |
-| Luchador: corre a terminar la pelea, nunca bloquea | 50,9% |
-| Pasivo: bloquea siempre que puede | 59,0% |
-
-**Estilos de pasillo** — cuánto explorás y cuándo gastás:
-
-| Estilo | Muertes |
-|---|---|
-| Limpia todo, cura apenas baja la vida | 55,2% |
-| Limpia todo a lo bruto | 58,7% |
-| Limpia todo, guarda los items para el profesor | 58,8% |
-| Limpia la mitad del pasillo | 59,6% |
-| **Va derecho al profesor** | **94,4%** |
-
-**Degeneradas:** repetir una sola acción muere el 100%.
-
-Los dos ejes se cruzan: un luchador que limpia todo juega distinto de un
-pasivo que va a media pasada, y los dos son viables.
+Seis estilos entre 49% y 61%, y el que piensa turno a turno gana por 3 puntos
+sobre el segundo. Saltearse el pasillo sigue siendo un error de 35 puntos.
 
 ---
 
@@ -272,6 +271,58 @@ el juego se veía como un item que sólo curaba y nunca cobraba. También estaba
 desconectada la red de seguridad de *Segundo aire*, por la misma razón. Nueve
 chequeos sobre los tres items nuevos, verificando el número exacto y no sólo
 que "pasa algo".
+
+### Bloquear pasó a bloquear todo, y también los estados
+
+Antes dejaba pasar el 40% y no servía contra los estados: sólo se podía
+responder a un golpe. Ahora **un bloqueo que sale para el golpe entero y
+también lo que te quiere dejar algo encima**.
+
+Lo que impide que bloquear sea siempre la respuesta ya no es que deje pasar
+algo, sino dos reglas más limpias: **hay golpes imparables** y **bloquear casi
+no hace daño**. Un pasivo puro sobrevive pero no avanza.
+
+**Costo medido:** con la devolución en 3 el pasivo quedaba 20 puntos por
+debajo del luchador. Subirla a 5 —el techo que permite la regla de que nunca
+supere al ataque, que hace 6— cerró la brecha a 4 puntos.
+
+### Los consumibles no gastan turno
+
+Tomado de NO-SKIN. Cambia de raíz qué decidís sobre un item: ya no es "¿vale
+la pena perder un turno?" sino "¿lo quemo ahora o lo guardo?". Es la pregunta
+que queríamos que existiera.
+
+**Costo medido:** buffeó fuerte a los estilos agresivos, que ahora se curan sin
+perder tempo. Los estilos de ataque cayeron a 42% de muertes y hubo que subir
+el daño enemigo de ×1.25 a ×1.40.
+
+### El bug de la duración cero
+
+Cuando se hizo que los estados duraran la mitad contra profesores, la duración
+quedó en **1 turno** — y el descuento ocurre al final del mismo turno en que se
+aplica. El estado nacía y moría sin llegar a existir: se veía el cartel de "te
+agarró confusión" y no aparecía ninguna etiqueta.
+
+Medido: **1020 de 12.339 estados anunciados (8%) nunca quedaban marcados.**
+
+Arreglado aplicándolos con un turno de más, así sobreviven al descuento del
+turno en que caen. Ahora la duración declarada es la real.
+
+Esto explicaba también el reporte de que "el miedo actúa aunque se haya
+quitado": el motor nunca lo hacía —0 casos sobre 2000 partidas— pero ver el
+aviso sin ver la marca hacía que cualquier fallo posterior pareciera miedo
+invisible.
+
+### Rareza de items
+
+Tres niveles con peso de aparición 6 / 3 / 1:
+
+- **Común:** el caramelo, la tiza, la botella
+- **Raro:** el apunte, la venda, el alcohol, el café
+- **Único:** los anteojos, la lata del quiosco
+
+Los dos únicos son justamente los de forma nueva —el escudo y la sangría—, así
+que encontrarlos cambia cómo jugás esa run.
 
 ## Cómo volver atrás
 
