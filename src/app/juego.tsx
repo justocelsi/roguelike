@@ -562,17 +562,26 @@ function Pixeles({
   muriendo?: boolean;
 }) {
   const cols = data[0].length;
+  const filas = data.length;
   return (
     <div
       className={`grid ${clase} ${muriendo ? "muere" : ""}`}
-      style={{ gridTemplateColumns: `repeat(${cols}, 1fr)` }}
+      style={{
+        // `1fr` a secas es `minmax(auto, 1fr)`: con celdas de proporción fija
+        // se arma una dependencia circular de tamaño y las columnas crecen
+        // más allá del contenedor, así que el ancho declarado no lo contiene.
+        // `minmax(0, 1fr)` corta eso.
+        gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))`,
+        gridTemplateRows: `repeat(${filas}, minmax(0, 1fr))`,
+        // La proporción va en la caja, no en cada celda.
+        aspectRatio: `${cols} / ${filas}`,
+      }}
       aria-hidden
     >
       {data.flatMap((fila, y) =>
         fila.split("").map((ch, x) => (
           <div
             key={`${x}-${y}`}
-            className="aspect-square"
             style={{
               background: ch === "." ? "transparent" : "currentColor",
               opacity: ch === "+" ? 0.42 : 1,
