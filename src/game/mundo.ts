@@ -69,14 +69,27 @@ function armarLecturas(
   const pool = [...propios, ...ajenos];
 
   const elegidos = pickMany(rng, pool, Math.min(3, pool.length));
-  const pesos = elegidos.map(() => randInt(rng, 1, 5));
-  const total = pesos.reduce((a, b) => a + b, 0);
+
+  /*
+   * Los porcentajes salen enteros y en múltiplos de 5, y suman 100 exacto.
+   * Antes eran pesos al azar normalizados a decimales y se mostraban
+   * redondeados, así que la puerta decía "37% 33% 31%" y encima no cerraba
+   * en 100. Un número redondo se compara de un vistazo; uno con coma hay
+   * que leerlo.
+   */
+  const PASO = 5;
+  const bloques = 100 / PASO;
+  const reparto = elegidos.map(() => 1);
+  for (let i = elegidos.length; i < bloques; i++) {
+    reparto[randInt(rng, 0, elegidos.length - 1)]++;
+  }
   const lecturas = elegidos.map((enemigoId, i) => ({
     enemigoId,
-    prob: pesos[i] / total,
+    prob: reparto[i] * PASO,
   }));
 
-  let roll = random(rng);
+  // Se sortea contra los mismos números que ve el jugador.
+  let roll = randInt(rng, 1, 100);
   let sorteado = lecturas[lecturas.length - 1].enemigoId;
   for (const l of lecturas) {
     roll -= l.prob;

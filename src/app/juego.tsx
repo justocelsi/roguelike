@@ -524,7 +524,7 @@ function Pasillo({
                     {cerca.lecturas.map((l) => (
                       <li key={l.enemigoId} className="text-sm text-dim">
                         <span className="tabular-nums text-foreground">
-                          {num(l.prob * 100, c)}%
+                          {num(l.prob, c)}%
                         </span>{" "}
                         {ENEMIGOS[l.enemigoId].nombre}
                       </li>
