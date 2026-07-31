@@ -267,6 +267,8 @@ function reglas() {
    * vez, cuando esa tirada ya se había hecho al apretar el botón.
    */
   const ruleta: Record<number, { n: number; salieron: number }> = {};
+  /** Para que la prueba del escudo no pase por no haber visto ninguno. */
+  let escudosVistos = 0;
 
   for (let n = 0; n < 1200; n++) {
     let s = initialState((Math.random() * 1e9) | 0);
@@ -339,6 +341,30 @@ function reglas() {
       if (a.type === "combate" && nuevas.some((e) => e.texto.includes("No te sale")) && !teniaMiedo) {
         fallo("el miedo sólo actúa si lo tenés");
       }
+      /*
+       * El escudo se ve hasta que se rompe, y se rompe una sola vez.
+       *
+       * La marca de "estás cubierto" sale de la foto de cada evento, no del
+       * estado: si saliera del estado, se apagaría en cuanto el motor resuelve
+       * el turno, o sea antes de que la secuencia muestre el golpe que frenó.
+       * Así que la cuenta sólo puede bajar en el evento que lo dice.
+       */
+      if (antes.fase === "combate") {
+        let previo = antes.combate!.escudo;
+        for (const e of [...nuevas].reverse()) {
+          const ahora = e.escudo ?? previo;
+          if (e.escudoUsado) {
+            escudosVistos++;
+            if (ahora !== previo - 1) {
+              fallo("el escudo se gasta de a uno", `${previo} → ${ahora}`);
+            }
+          } else if (ahora < previo) {
+            fallo("el escudo no se apaga sin decirlo", e.texto);
+          }
+          previo = ahora;
+        }
+      }
+
       /*
        * Un enemigo no revive. Cada evento lleva la foto de cómo quedaron las
        * vidas justo después, y la interfaz dibuja la barra con esa foto — así
@@ -506,6 +532,10 @@ function reglas() {
    * cubierto—, así que ese arco caía del lado bueno el 4,9% de las veces y con
    * 266 muestras el test lo dejaba pasar por poco.
    */
+  if (escudosVistos < 20) {
+    fallo("se probaron escudos de verdad", `sólo ${escudosVistos} en 1200 partidas`);
+  }
+
   for (const [texto, b] of Object.entries(ruleta)) {
     if (b.n < 120) continue;
     const prob = Number(texto);
@@ -551,6 +581,9 @@ function reglas() {
     "el escudo no se desborda",
     "un estado no se apila consigo mismo",
     "un estado no dura más de lo declarado",
+    "el escudo se gasta de a uno",
+    "el escudo no se apaga sin decirlo",
+    "se probaron escudos de verdad",
   ];
   let todo = true;
   for (const r of REGLAS) {

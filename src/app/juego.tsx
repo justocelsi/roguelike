@@ -56,6 +56,8 @@ const RITMO_AVISO = 2000;
  * que llegar a frenar y el resultado tiene que llegar a leerse después.
  */
 const RITMO_TIRADA = 1750;
+/** Y el escudo rompiéndose: medio segundo entero, y después cae. */
+const RITMO_ESCUDO = 1900;
 
 /*
  * Los beats del umbral: la puerta, la luz subiendo, y lo que hay adentro
@@ -156,8 +158,11 @@ export default function Juego() {
   }
 
   // Sólo los estados frenan la pantalla entera; el resto va en línea.
-  const evento =
-    actual?.icono ? <EventoEfecto entrada={actual} k={restantes} /> : null;
+  const evento = actual?.icono ? (
+    <EventoEfecto entrada={actual} k={restantes} />
+  ) : actual?.escudoUsado ? (
+    <EventoEscudo entrada={actual} k={restantes} />
+  ) : null;
   const inventario = verInventario ? (
     <Inventario state={state} onCerrar={() => setVerInventario(false)} />
   ) : null;
@@ -1243,6 +1248,8 @@ function Cabecera({
 }) {
   const j = state.jugador;
   const efectos = momento?.efectos ?? state.efectos;
+  // Cuántos golpes te quedan cubiertos, de la foto del evento y no del estado.
+  const escudo = momento?.escudo ?? state.combate?.escudo ?? 0;
   const c = efectos.some((e) => e.efecto === "confusion");
   const vida = momento?.vidaJugador ?? j.vida;
   return (
@@ -1277,8 +1284,24 @@ function Cabecera({
         <span>{j.items.length + j.sombras.length} en el bolsillo</span>
       </div>
       {/* Se apilan y se envuelven: si te agarran dos cosas, se ven las dos. */}
-      {(efectos.length > 0 || j.defectos.length > 0) && (
+      {(efectos.length > 0 || escudo > 0 || j.defectos.length > 0) && (
         <div className="flex flex-wrap items-start gap-2 text-sm">
+          {/*
+            El escudo esperando el golpe. Va primero y con el ícono del item que
+            lo puso, para que se lea como "los anteojos están puestos" y no como
+            un estado más: sin esto, lo único que te decía que seguías cubierto
+            era acordarte de haberlos usado.
+          */}
+          {escudo > 0 && (
+            <Etiqueta
+              clase="border border-sueno text-sueno"
+              explicacion="Los anteojos están puestos: el próximo golpe que te entre no te toca, y ahí se gastan."
+            >
+              <Pixeles data={ICONOS_ITEM.anteojos} clase="w-3 shrink-0" />
+              CUBIERTO
+              {escudo > 1 && <span className="tabular-nums opacity-70">×{escudo}</span>}
+            </Etiqueta>
+          )}
           {efectos.map((e) => (
             <Etiqueta
               key={e.efecto}
@@ -1345,6 +1368,8 @@ function useSecuencia(log: Entrada[], pausado = false) {
         if (entrada.aviso) return { entrada, dura: RITMO_AVISO };
         // Y si hubo tirada, el reloj tiene que llegar a frenar.
         if (entrada.tirada) return { entrada, dura: RITMO_TIRADA };
+        // Los anteojos aguantan medio segundo y después se rompen enteros.
+        if (entrada.escudoUsado) return { entrada, dura: RITMO_ESCUDO };
         // El último evento de una mano se queda más tiempo: ese silencio es
         // el turno pasando de un lado al otro.
         const siguiente = cronologico[k + 1];
@@ -1408,6 +1433,45 @@ function EventoEfecto({ entrada, k }: { entrada: Entrada; k: number }) {
       </div>
     </div>
   );
+}
+
+/**
+ * El escudo interponiéndose, y gastándose en el acto.
+ *
+ * Es el único evento bueno que se gana la pantalla entera, y se la gana por lo
+ * mismo que se la gana un estado: pasó algo que cambia las reglas del turno.
+ * Antes esto era una línea de texto más —"lo viste llegar y no te tocó"— y no
+ * había forma de atarla al item que la causó ni de ver que se había consumido.
+ *
+ * Los anteojos se rompen píxel por píxel, con la misma animación con la que se
+ * caen los enemigos.
+ */
+function EventoEscudo({ entrada, k }: { entrada: Entrada; k: number }) {
+  return (
+    <div
+      key={`escudo-${k}-${entrada.texto}`}
+      className="pasa-por-encima-largo fixed inset-0 z-40 flex items-center justify-center bg-background/80 px-8"
+    >
+      <div className="aparece flex max-w-sm flex-col items-center gap-4 text-center">
+        <span className="text-xs tracking-[0.35em] text-sueno">SE INTERPUSIERON</span>
+        <Pixeles
+          data={ICONOS_ITEM.anteojos}
+          clase="w-20 text-sueno rompe-tarde"
+          muriendo
+        />
+        <p className="text-lg leading-snug text-sueno">{entrada.texto}</p>
+        <span className="text-sm text-dim">Los anteojos se rompen ahí.</span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Los eventos que se ganan la pantalla entera. El resto va en línea, arriba de
+ * los botones, sin tapar el combate.
+ */
+function tapaLaPantalla(e: Entrada | null): boolean {
+  return !!e && (!!e.icono || !!e.escudoUsado);
 }
 
 /** El detalle numérico de lo que el enemigo va a intentar. */
@@ -1714,7 +1778,7 @@ function Combate({
         motor ya avanzó el paso del enemigo, así que lo que diría es lo que va a
         hacer el turno que viene, adelantado. Y no hay nada que decidir todavía.
       */}
-      {actual && !actual.icono ? (
+      {actual && !tapaLaPantalla(actual) ? (
         <EventoEnLinea
           entrada={actual}
           k={restantes}

@@ -244,6 +244,19 @@ body {
 .pasa-por-encima {
   animation: pasar-por-encima 0.78s ease-in-out forwards;
 }
+/* Los anteojos rompiéndose necesitan más rato que un estado. */
+.pasa-por-encima-largo {
+  animation: pasar-por-encima 1.7s ease-in-out forwards;
+}
+
+/*
+ * Y aguantan medio segundo antes de romperse: primero se ve que fueron ellos
+ * los que se interpusieron, y después se los ve irse. Si se rompieran en el
+ * mismo frame en que aparecen, no se llegaría a leer qué frenó el golpe.
+ */
+.rompe-tarde > div {
+  animation-delay: 0.5s;
+}
 
 /*
  * Y una pantalla nueva tampoco aparece de un frame al otro. Es el fundido más

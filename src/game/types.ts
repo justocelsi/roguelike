@@ -213,6 +213,15 @@ export type Entrada = {
    */
   efectos?: EfectoActivo[];
   /**
+   * Y cuántos golpes te quedaban cubiertos. Va en la foto por lo mismo: sin
+   * esto, la marca de "estás cubierto" se apagaría en cuanto el motor resuelve
+   * el turno, o sea antes de que la secuencia llegue a mostrar el golpe que el
+   * escudo frenó.
+   */
+  escudo?: number;
+  /** Este evento es el escudo interponiéndose y gastándose. */
+  escudoUsado?: boolean;
+  /**
    * Quién lo hizo. La interfaz mete una pausa larga cuando el turno cambia de
    * manos, para que se lea como una secuencia y no como un bloque.
    */

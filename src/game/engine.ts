@@ -288,7 +288,12 @@ function logEstado(
   texto: string,
   tipo: Entrada["tipo"] = "neutral",
   actor?: Entrada["actor"],
-  extra?: { icono?: Efecto; aviso?: boolean; tirada?: Entrada["tirada"] },
+  extra?: {
+    icono?: Efecto;
+    aviso?: boolean;
+    tirada?: Entrada["tirada"];
+    escudoUsado?: boolean;
+  },
 ): Entrada[] {
   return [
     {
@@ -301,6 +306,7 @@ function logEstado(
       vidaJugador: Math.max(0, s.jugador.vida),
       vidaEnemigo: s.combate ? Math.max(0, s.combate.vida) : undefined,
       efectos: s.efectos,
+      escudo: s.combate?.escudo,
     },
     ...s.log,
   ].slice(0, 30);
@@ -486,7 +492,12 @@ function turnoEnemigo(
       if (daño > 0 && s.combate!.escudo > 0) {
         daño = 0;
         s = { ...s, combate: { ...s.combate!, escudo: s.combate!.escudo - 1 } };
-        s = { ...s, log: logEstado(s, "Lo viste llegar y no te tocó.", "bueno") };
+        s = {
+          ...s,
+          log: logEstado(s, "Lo viste llegar y no te tocó.", "bueno", undefined, {
+            escudoUsado: true,
+          }),
+        };
       } else {
         s = { ...s, jugador: { ...s.jugador, vida: s.jugador.vida - daño } };
         /*
@@ -703,6 +714,7 @@ function ganarCombate(state: State, rng: Rng): State {
         vidaJugador: Math.max(0, state.jugador.vida),
         vidaEnemigo: 0,
         efectos: state.efectos,
+        escudo: state.combate?.escudo,
       },
       ...entradas,
     ].slice(0, 30);

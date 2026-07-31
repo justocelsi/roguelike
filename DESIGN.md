@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 24 invariantes automáticas y 44 comprobaciones de números
+Verificado con 27 invariantes automáticas y 44 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Nada aparece de un frame al otro
@@ -159,6 +159,11 @@ formas distintas, tomadas de NO-SKIN:
   temprano, que es cuando menos sabés contra qué estás.
 - **Los anteojos** absorben el próximo golpe entero. Es la respuesta a un
   golpe imparable: te dejan atacar en el turno en que cubrirse no sirve.
+  Mientras estén puestos hay una marca arriba —**CUBIERTO**— porque un escudo
+  que espera sin decirlo es un escudo que te olvidás que tenés; y cuando frenan
+  un golpe se ganan la pantalla entera y se rompen píxel por píxel, con la misma
+  animación con la que se caen los enemigos. Un único que se gasta tiene que
+  verse gastar.
 - **La lata** te cobra 4 por turno pero te devuelve la mitad de lo que hacés.
   Riesgo puro; premia al que corre a terminar la pelea.
 
