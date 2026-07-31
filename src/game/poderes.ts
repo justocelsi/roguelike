@@ -38,7 +38,7 @@ export const PODERES: Record<string, Poder> = {
     nombre: "Parpadeo",
     texto: "Cerrás los ojos un segundo largo. Recuperás 22.",
     usos: 1,
-    precision: 0.88,
+    precision: 0.9,
     efecto: { vida: 22 },
   },
   memoria: {

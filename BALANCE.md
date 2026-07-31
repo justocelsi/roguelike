@@ -29,8 +29,8 @@ aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 | `PASA_BLOQUEANDO` | **0** | `engine.ts` | Un bloqueo que sale no deja pasar nada |
 | `MULT_ENEMIGO` | **1.65** | `engine.ts` | Perilla global del daño enemigo |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
-| `PRECISION_ATAQUE` | **0.92** | `engine.ts` | Puntería del golpe a mano limpia |
-| `FALLA_POR_MIEDO` | **0.30** | `engine.ts` | Chance de que una acción no salga con miedo |
+| `PRECISION_ATAQUE` | **0.90** | `engine.ts` | Puntería del golpe a mano limpia |
+| `RESTA_MIEDO` | **0.20** | `engine.ts` | Puntería que te saca el miedo, restando |
 | `EV` (escala de vida) | **0.10** | `engine.ts` | Vida enemiga por ciclo |
 | `ED` (escala de daño) | **0.04** | `engine.ts` | Daño enemigo por ciclo |
 | `MAX_ARMAS` | **3** | `engine.ts` | Tope de la mochila |
@@ -60,16 +60,16 @@ minijuegos.
 
 | Estilo | Muertes | Ciclo |
 |---|---|---|
-| Guarda los items para el profesor | **52,1%** | 3,2 |
-| Calculador: decide turno a turno | 52,3% | 3,2 |
-| Pasivo: bloquea siempre que sirve | 55,6% | 3,0 |
-| Media pasada del pasillo | 60,8% | 2,9 |
-| A lo bruto: el arma que más pegue | 60,8% | 2,7 |
-| Luchador: nunca bloquea | 61,4% | 2,7 |
-| **Derecho al profesor** | **86,2%** | 2,0 |
+| Guarda los items para el profesor | **51,2%** | 3,2 |
+| Calculador: decide turno a turno | 53,3% | 3,1 |
+| Pasivo: bloquea siempre que sirve | 58,7% | 3,0 |
+| Media pasada del pasillo | 60,1% | 2,9 |
+| A lo bruto: el arma que más pegue | 63,4% | 2,6 |
+| Luchador: nunca bloquea | 64,3% | 2,6 |
+| **Derecho al profesor** | **87,7%** | 1,9 |
 
-Seis estilos dentro de 9 puntos, todos en la banda. Saltearse el pasillo sigue
-siendo un error de 25 puntos.
+Los cuatro estilos que piensan quedan en 51–60 y los dos que van a lo bruto en
+63–64. Saltearse el pasillo sigue siendo un error de 24 puntos.
 
 ---
 
@@ -539,6 +539,75 @@ probabilidad total que antes (0,7 × 0,9 = 0,63), así que el balance no se movi
 margen ahora se calcula —cuatro errores estándar de una binomial, con un piso
 para los grupos grandes— así que un grupo chico exige una desviación grande y
 uno grande detecta desviaciones finas. `RULETA=1` imprime todos los arcos.
+
+### Lo que no se veía, y lo que se veía mal
+
+Reportado jugando: *"a veces la vida parece regenerarse en el enemigo cuando se
+lo mata"* y *"los efectos parecen aplicarse en momentos incorrectos"*. Las dos
+eran ciertas y las dos tenían la misma causa.
+
+El motor resuelve el turno entero de un saque, así que cuando la secuencia
+recién va por tu primera acción el estado ya tiene el final. Cada evento lleva
+una foto de cómo quedaron las cosas justo después, y la interfaz dibuja esa foto
+— pero sólo para las vidas, y sólo si el evento la traía.
+
+**El enemigo revivía.** Las líneas de la victoria —"deja de estar", "guardás la
+tiza"— no traían foto, así que la barra caía al combate congelado, que es el del
+turno *anterior* al remate. Reproducido: la barra iba **0 → 4 → 4**.
+
+**Y los estados se adelantaban.** La ficha de arriba leía el estado en vivo, así
+que la etiqueta de CONFUSIÓN aparecía mientras la secuencia todavía mostraba tu
+propio ataque, y se iba antes de que expirara. Los números de la pantalla se
+desordenaban antes del evento que te confundía.
+
+Ahora la foto incluye los estados, y todo evento del combate la lleva. Dos
+invariantes lo sostienen: *cada evento del combate dice cómo quedó el enemigo* y
+*el enemigo no revive*.
+
+### Cubrirse tapaba medio turno
+
+Con torpeza el enemigo se mueve dos veces. Cada movimiento consultaba el estado
+de bloqueo por su cuenta y el primero lo apagaba, así que **el segundo entraba
+siempre de lleno**. La pantalla muestra los dos avisos y un solo botón de
+BLOQUEAR: no había forma de saberlo.
+
+Medido con el arreglo puesto y sacado: **225 golpes de 1200 partidas** entraban
+así. Ahora la tirada del bloqueo se hace una sola vez por turno y vale para todo
+lo que el enemigo haga, que es lo que la regla decía desde el principio —una
+tirada, un resultado—.
+
+### El escudo se quemaba solo
+
+`escudo` era un sí/no, así que usar unos anteojos teniendo otros puestos
+consumía un item único sin que pasara nada y sin decir nada. Ahora es una cuenta
+de golpes cubiertos.
+
+### Todo de a 5
+
+Pedido jugando: *"que los porcentajes dentro del combate también sean un poco
+más simples de entender, lo ideal es que sean todos múltiplos de 5"*.
+
+Eso obligó a dos cambios de fondo, los dos buenos por su cuenta:
+
+**El miedo resta en vez de multiplicar.** Multiplicando, un 90% con miedo daba
+63%. Ahora saca 20 puntos fijos y la regla se dice en una línea.
+
+**Una acción, una tirada.** Atacar tiraba dos veces —una por el miedo, otra por
+la puntería— y mostraba el producto. Ahora hay un solo número y una sola tirada,
+y `conTirada` recibe la chance *ya calculada*: la misma variable contra la que se
+tiró el dado, así que el reloj no puede declarar un arco y resolver con otro.
+
+El resto fue redondear el contenido. El único con costo real es el desgaste de
+las armas, que pasó de 0,03–0,04 a **0,05** por uso porque es el múltiplo de 5
+más chico: eso solo subió las muertes unos 3 puntos.
+
+| | Banda de los seis estilos |
+|---|---|
+| Antes de redondear | 48,4% – 61,9% |
+| **Después** | **51,2% – 64,3%** |
+
+Se aceptó sin tocar `MULT_ENEMIGO`: los cuatro estilos que piensan quedan en
+51–60 y los dos que van a lo bruto en 63–64, que es la forma que se buscaba.
 
 ## Cómo volver atrás
 

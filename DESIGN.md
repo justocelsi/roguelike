@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 18 invariantes automáticas y 43 comprobaciones de números
+Verificado con 24 invariantes automáticas y 44 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Nada aparece de un frame al otro
@@ -264,10 +264,13 @@ justo es la jugada más rentable del juego; cubrirte de más es perder el turno.
 No son números, son reglas que cambian mientras duran:
 
 - **Confusión** — los números de la interfaz se muestran mal.
-- **Miedo** — tu acción puede fallar directamente.
+- **Miedo** — todo lo que hagas apunta **20 puntos peor**. Resta, no
+  multiplica: multiplicando, un 90% con miedo daba 63% y ningún número de la
+  pantalla caía redondo.
 - **Torpeza** — el enemigo actúa dos veces por turno tuyo, **desde el turno
   siguiente**. Mientras la tengas, la interfaz te muestra los dos avisos: todo
-  lo que te pasa tiene que haber estado anunciado.
+  lo que te pasa tiene que haber estado anunciado. Y cubrirte vale para las
+  dos: una tirada, un resultado, todo el turno.
 
 Se pueden bloquear, salvo que la intención sea imparable. Contra un profesor
 duran la mitad.
@@ -328,6 +331,21 @@ Sorteados por separado: 6 × 6 = 36 ofertas con la mitad del contenido escrito.
 interceptores sobre el motor — agregar uno es agregar un objeto a un catálogo.
 
 ---
+
+## Todos los porcentajes van de a 5
+
+Igual que los de las puertas, y por la misma razón: un número en múltiplos de 5
+se piensa de cabeza en el medio de un turno. **90% de acertar** se entiende; 82%
+obliga a leerlo entero para no entender nada mejor.
+
+Eso obligó a que el miedo **reste** en vez de multiplicar —multiplicando, un 90%
+con miedo daba 63%— y a redondear todo el contenido: la puntería de las armas,
+su desgaste por uso, los críticos, los items, los poderes y lo que apunta cada
+enemigo.
+
+Y obligó a algo mejor: **una acción, una tirada.** Antes atacar tiraba dos veces
+—una por el miedo y otra por la puntería— y la pantalla mostraba el producto.
+Ahora hay un solo número y una sola tirada, que es la que gira en el reloj.
 
 ## Estética
 

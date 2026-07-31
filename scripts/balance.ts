@@ -339,11 +339,37 @@ function reglas() {
       if (a.type === "combate" && nuevas.some((e) => e.texto.includes("No te sale")) && !teniaMiedo) {
         fallo("el miedo sólo actúa si lo tenés");
       }
+      /*
+       * Un enemigo no revive. Cada evento lleva la foto de cómo quedaron las
+       * vidas justo después, y la interfaz dibuja la barra con esa foto — así
+       * que si un evento no la trae, la barra cae al estado actual y salta.
+       *
+       * Es lo que pasaba al matarlo: las líneas de la victoria no traían foto y
+       * la barra volvía al valor de antes del remate. Se veía revivir.
+       */
+      if (antes.fase === "combate") {
+        const cronologicas = [...nuevas].reverse();
+        let previa = antes.combate!.vida;
+        for (const e of cronologicas) {
+          if (e.vidaEnemigo === undefined) {
+            fallo("cada evento del combate dice cómo quedó el enemigo", e.texto);
+            continue;
+          }
+          if (e.vidaEnemigo > previa) fallo("el enemigo no revive", e.texto);
+          previa = e.vidaEnemigo;
+        }
+      }
+
       for (const e of nuevas) {
         if (!e.tirada) continue;
         const { prob, salio } = e.tirada;
-        if (!Number.isInteger(prob) || prob < 0 || prob > 100) {
-          fallo("la ruleta muestra un porcentaje entero", String(prob));
+        /*
+         * Todo porcentaje que se muestre va de a 5. Es lo que se puede pensar
+         * de cabeza en el medio de un turno, y es la razón por la que el miedo
+         * resta en vez de multiplicar: multiplicando, 90% con miedo daba 63%.
+         */
+        if (!Number.isInteger(prob) || prob < 0 || prob > 100 || prob % 5 !== 0) {
+          fallo("los porcentajes del combate van de a 5", `${prob}% en "${e.texto}"`);
         }
         const b = (ruleta[prob] ??= { n: 0, salieron: 0 });
         b.n++;
@@ -374,6 +400,37 @@ function reglas() {
       }
 
       if (a.type === "combate") {
+        /*
+         * Cubrirse vale para el turno entero. Con torpeza el enemigo se mueve
+         * dos veces, y cada movimiento consultaba el estado de bloqueo por su
+         * cuenta: el primero lo apagaba y el segundo entraba de lleno. La
+         * pantalla muestra los dos avisos y un solo botón, así que no había
+         * forma de saber que sólo se tapaba la mitad.
+         *
+         * "De lleno" es el texto del golpe que entra sin que te estuvieras
+         * cubriendo: si te cubriste, no puede aparecer nunca.
+         */
+        if (a.accion === "bloquear" && nuevas.some((e) => e.texto.startsWith("De lleno"))) {
+          fallo("cubrirse vale para todo el turno");
+        }
+
+        /*
+         * Y el estado del combate no se desborda por acumulación: dos anteojos
+         * seguidos, tres cafés, un estado aplicado encima de sí mismo.
+         */
+        const cb = s.combate;
+        if (cb) {
+          if (cb.escudo < 0 || cb.escudo > 6) fallo("el escudo no se desborda", String(cb.escudo));
+          if (cb.buff < 0) fallo("el escudo no se desborda", `buff ${cb.buff}`);
+        }
+        const tipos = s.efectos.map((e) => e.efecto);
+        if (new Set(tipos).size !== tipos.length) {
+          fallo("un estado no se apila consigo mismo", tipos.join(","));
+        }
+        if (s.efectos.some((e) => e.turnos < 1 || e.turnos > 4)) {
+          fallo("un estado no dura más de lo declarado", JSON.stringify(s.efectos));
+        }
+
         /*
          * Un bloqueo que sale para el golpe entero, igual que para un estado.
          * `Math.max(1, …)` sobre un daño que ya era cero dejaba pasar 1: la
@@ -486,8 +543,14 @@ function reglas() {
     "un bloqueo que sale para el golpe entero",
     "usar no le da el turno al enemigo",
     "un enemigo caído no se mueve más",
-    "la ruleta muestra un porcentaje entero",
+    "los porcentajes del combate van de a 5",
     "la ruleta no miente",
+    "cada evento del combate dice cómo quedó el enemigo",
+    "el enemigo no revive",
+    "cubrirse vale para todo el turno",
+    "el escudo no se desborda",
+    "un estado no se apila consigo mismo",
+    "un estado no dura más de lo declarado",
   ];
   let todo = true;
   for (const r of REGLAS) {
@@ -663,6 +726,40 @@ function juegos() {
   );
   debe("premio de 0 no da nada", premioDe(rng, "biologia", 0).length, 0);
   debe("premio de 2 da dos", premioDe(rng, "biologia", 2).length, 2);
+
+  /*
+   * Los números de donde salen esos porcentajes, en el contenido. Redondos acá
+   * es la única forma de que sigan redondos después de restarles el miedo y el
+   * desgaste del arma.
+   */
+  const deACinco = (v: number) => Math.abs(Math.round(v * 20) - v * 20) < 1e-9;
+  const sueltos: string[] = [];
+  for (const e of Object.values(ENEMIGOS)) {
+    for (const i of e.patron) {
+      if (i.precision !== undefined && !deACinco(i.precision)) {
+        sueltos.push(`${e.id}:${i.precision}`);
+      }
+    }
+  }
+  for (const a of Object.values(ARMAS)) {
+    for (const [k, v] of [
+      ["precision", a.precision],
+      ["desgaste", a.desgaste],
+      ["critico", a.critico],
+      ["perdida", a.perdida ?? 0],
+    ] as const) {
+      if (!deACinco(v)) sueltos.push(`${a.id}.${k}:${v}`);
+    }
+  }
+  for (const i of Object.values(ITEMS)) {
+    if (!deACinco(i.precision)) sueltos.push(`${i.id}:${i.precision}`);
+  }
+  for (const [id, po] of Object.entries(PODERES)) {
+    if (!deACinco(po.precision)) sueltos.push(`${id}:${po.precision}`);
+    const cp = po.pasivo?.contraPrecision;
+    if (cp !== undefined && !deACinco(cp)) sueltos.push(`${id}.contra:${cp}`);
+  }
+  debe("todo el contenido va de a 5", sueltos.join(",") || "todo redondo", "todo redondo");
 
   for (const f of fallas) console.log(`  FALLA ${f}`);
   if (!fallas.length) console.log(`  OK    puertas y minijuegos (${comprobadas} números exactos)`);

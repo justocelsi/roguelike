@@ -8,7 +8,7 @@ import {
   DAÑO_ATAQUE,
   bloqueoDe,
   armasUsables,
-  factorMiedo,
+  punteria,
   avisos,
   veElAviso,
   initialState,
@@ -210,7 +210,7 @@ export default function Juego() {
         {state.fase !== "sueño" && (
           <Cabecera
             state={congelado ?? state}
-            vidaMostrada={actual?.vidaJugador}
+            momento={actual}
             onInventario={() => setVerInventario(true)}
           />
         )}
@@ -1222,18 +1222,29 @@ function usosTexto(state: State, id: string): string {
   return String(state.combate ? usosArma(state, id) : ARMAS[id].usos);
 }
 
+/**
+ * La ficha de arriba, que lee `momento` y no el estado.
+ *
+ * El motor resuelve el turno entero de un saque, así que el estado ya tiene el
+ * final cuando la secuencia recién va por el principio. Mostrarlo en vivo hacía
+ * que la etiqueta de CONFUSIÓN apareciera mientras todavía se veía tu propio
+ * ataque —antes del evento que te la aplica— y que se fuera antes de expirar.
+ * Cada evento trae su foto; la ficha dibuja esa foto.
+ */
 function Cabecera({
   state,
-  vidaMostrada,
+  momento,
   onInventario,
 }: {
   state: State;
-  vidaMostrada?: number;
+  /** El evento que se está mostrando, si hay alguno. */
+  momento?: Entrada | null;
   onInventario?: () => void;
 }) {
   const j = state.jugador;
-  const c = confundido(state);
-  const vida = vidaMostrada ?? j.vida;
+  const efectos = momento?.efectos ?? state.efectos;
+  const c = efectos.some((e) => e.efecto === "confusion");
+  const vida = momento?.vidaJugador ?? j.vida;
   return (
     <header className="shrink-0 space-y-2">
       <div className="flex items-center justify-between gap-3 text-sm">
@@ -1266,9 +1277,9 @@ function Cabecera({
         <span>{j.items.length + j.sombras.length} en el bolsillo</span>
       </div>
       {/* Se apilan y se envuelven: si te agarran dos cosas, se ven las dos. */}
-      {(state.efectos.length > 0 || j.defectos.length > 0) && (
+      {(efectos.length > 0 || j.defectos.length > 0) && (
         <div className="flex flex-wrap items-start gap-2 text-sm">
-          {state.efectos.map((e) => (
+          {efectos.map((e) => (
             <Etiqueta
               key={e.efecto}
               clase="bg-malo text-background"
@@ -1610,13 +1621,19 @@ function Combate({
   if (!c) return null;
   const enemigo = ENEMIGOS[c.enemigoId];
   const intencion = enemigo.patron[c.paso % enemigo.patron.length];
-  const conf = confundido(state);
+  /*
+   * Los estados que se ven, que son los del evento que se está mostrando y no
+   * los del estado final. Si no, los números se desordenaban por la confusión
+   * antes de que se viera el evento que te la aplica.
+   */
+  const efectosVistos = actual?.efectos ?? state.efectos;
+  const conf = efectosVistos.some((e) => e.efecto === "confusion");
   const j = state.jugador;
   // Con miedo encima, lo que vale es el producto de las dos tiradas.
   const ciego = !veElAviso(state);
   const losAvisos = avisos(state);
-  const miedo = factorMiedo(state);
-  const pct = (p: number) => Math.round(p * miedo * 100);
+  // El mismo número que va a girar en el reloj: sale de la misma función.
+  const pct = (p: number) => Math.round(punteria(state, p) * 100);
 
   const act = (accion: Accion, ref?: string) => {
     if (contando) return;
@@ -1688,8 +1705,15 @@ function Combate({
         </div>
       </div>
 
-      {/* Un evento por vez, arriba de los botones. Cuando no pasa nada, el
-          aviso vigente queda a la vista para poder decidir. */}
+      {/*
+        Un evento por vez, arriba de los botones. Cuando no queda nada por
+        mostrar, el aviso vigente queda a la vista para poder decidir.
+
+        Mientras la secuencia corre el aviso NO se muestra, ni siquiera cuando
+        el evento del momento tapa la pantalla con un estado: en ese rato el
+        motor ya avanzó el paso del enemigo, así que lo que diría es lo que va a
+        hacer el turno que viene, adelantado. Y no hay nada que decidir todavía.
+      */}
       {actual && !actual.icono ? (
         <EventoEnLinea
           entrada={actual}
@@ -1697,6 +1721,8 @@ function Combate({
           numeros={ciego ? undefined : numerosDe(intencion)}
           ciego={ciego}
         />
+      ) : contando ? (
+        <div className="min-h-18 shrink-0" />
       ) : (
         <div
           className={`flex min-h-18 shrink-0 flex-col justify-center gap-1 border-l-2 px-4 py-2.5 ${

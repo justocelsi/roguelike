@@ -162,7 +162,12 @@ export type Combate = {
   redUsada: boolean;
   /** Lo que aportan los items que duran toda la pelea. */
   buff: number;
-  escudo: boolean;
+  /**
+   * Cuántos golpes te quedan cubiertos. Es una cuenta y no un sí/no porque con
+   * un booleano, usar unos anteojos teniendo otros puestos quemaba un item
+   * único sin que pasara nada y sin decir nada.
+   */
+  escudo: number;
   sangria: { porTurno: number; robo: number } | null;
 };
 
@@ -199,6 +204,14 @@ export type Entrada = {
    */
   vidaJugador?: number;
   vidaEnemigo?: number;
+  /**
+   * Y qué estados tenías encima justo después. Por la misma razón que las
+   * vidas: el motor resuelve el turno entero de un saque, así que si la ficha
+   * de arriba leyera el estado actual, la etiqueta de CONFUSIÓN aparecería
+   * mientras la secuencia todavía está mostrando tu propio ataque —o sea, antes
+   * del evento que te la aplica— y se iría antes de que expire.
+   */
+  efectos?: EfectoActivo[];
   /**
    * Quién lo hizo. La interfaz mete una pausa larga cuando el turno cambia de
    * manos, para que se lea como una secuencia y no como un bloque.
