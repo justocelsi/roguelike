@@ -363,7 +363,7 @@ export const ITEMS: Record<string, Item> = {
   alcohol: {
     id: "alcohol",
     nombre: "el alcohol del laboratorio",
-    descripcion: "Se lo tirás encima. 16 de daño.",
+    descripcion: "Se lo tirás encima.",
     rareza: "raro",
     precision: 0.7,
     efecto: { daño: 16 },
@@ -371,7 +371,7 @@ export const ITEMS: Record<string, Item> = {
   tiza: {
     id: "tiza",
     nombre: "la tiza",
-    descripcion: "Se la tirás. 12 de daño.",
+    descripcion: "Se la tirás.",
     rareza: "comun",
     precision: 0.75,
     efecto: { daño: 12 },

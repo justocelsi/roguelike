@@ -354,6 +354,18 @@ export function potencia(state: State): number {
 }
 const POR_PROFESOR = Number(process.env.NEXT_PUBLIC_POTENCIA ?? 0.4);
 
+/**
+ * Lo que un golpe tuyo hace de verdad ahora mismo: con el café que te tomaste,
+ * con el bonus de cada profesor vencido, y con lo que te resten los defectos.
+ *
+ * Exportada porque la pantalla tiene que mostrar **este** número y no el de la
+ * ficha del arma. Un botón que dice 14 cuando el golpe hace 19 esconde
+ * justamente la progresión que hace que vencer un profesor se sienta.
+ */
+export function dañoDe(state: State, base: number): number {
+  return aplicarDaño(state, base);
+}
+
 function aplicarDaño(state: State, base: number): number {
   let d = (base + (state.combate?.buff ?? 0)) * potencia(state);
   for (const def of defectosActivos(state)) if (def.daño) d = def.daño(d);

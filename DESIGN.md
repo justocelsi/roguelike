@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 28 invariantes automáticas y 44 comprobaciones de números
+Verificado con 29 invariantes automáticas y 44 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Nada aparece de un frame al otro
@@ -227,7 +227,16 @@ tenés que ver al enemigo decidir, ejecutar y sacarte lo que te saca, y recién
 después la pantalla del final. El aula no se cierra hasta que la secuencia
 terminó de contarse.
 
-**Cada profesor vencido suma +40% de daño a todo lo que hacés.** Sin eso los
+**Cada profesor vencido suma +40% de daño a todo lo que hacés.** Y se ve: el
+botón dice **8 (6 + 2)**, con el extra en oro —el mismo color con el que la
+recompensa te lo anunció cuando lo ganaste—. El total es lo que le entra al
+enemigo; el paréntesis es de dónde sale. Sin eso, la única progresión permanente
+del juego era un número que se movía por atrás.
+
+Lo mismo en las armas, en el contraataque, en los items que hacen daño y en la
+comparación al canjear un arma: todos muestran lo que van a hacer **en tu mano**,
+no lo que dice su ficha.
+ Sin eso los
 enemigos escalan por ciclo y tus números se quedan atrás: sin progresión, todos
 los estilos mueren el 85-91% de las veces.
 

@@ -24,6 +24,8 @@ import {
   initialState,
   MAX_ARMAS,
   PASA_BLOQUEANDO,
+  dañoDe,
+  DAÑO_ATAQUE,
   reduce,
   tieneEfecto,
   usosArma,
@@ -441,6 +443,24 @@ function reglas() {
 
       if (a.type === "combate") {
         /*
+         * El número que muestra el botón es el que le entra al enemigo.
+         *
+         * `dañoDe` es lo que la pantalla usa para escribir "8 (6 + 2)", y tiene
+         * que ser exactamente la misma cuenta que hace el motor cuando el golpe
+         * entra. Se comprueba contra la vida que perdió el enemigo, no contra
+         * el texto: lo que importa no es que coincidan dos strings sino que lo
+         * prometido sea lo que pasó.
+         */
+        const golpe = nuevas.find((e) => e.texto.startsWith("Le pegás."));
+        if (golpe && antes.combate && s.combate && s.combate.vida > 0) {
+          const bajo = antes.combate.vida - s.combate.vida;
+          const promete = dañoDe(antes, DAÑO_ATAQUE);
+          if (bajo !== promete) {
+            fallo("el daño que se muestra es el que entra", `mostró ${promete}, bajó ${bajo}`);
+          }
+        }
+
+        /*
          * Cubrirse vale para el turno entero. Con torpeza el enemigo se mueve
          * dos veces, y cada movimiento consultaba el estado de bloqueo por su
          * cuenta: el primero lo apagaba y el segundo entraba de lleno. La
@@ -599,6 +619,7 @@ function reglas() {
     "el escudo no se apaga sin decirlo",
     "se probaron escudos de verdad",
     "fuera del combate no te queda nada encima",
+    "el daño que se muestra es el que entra",
   ];
   let todo = true;
   for (const r of REGLAS) {

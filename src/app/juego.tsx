@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ARMAS, ENEMIGOS, EXPLICACION_EFECTO, ITEMS } from "@/game/content";
 import {
   CICLOS,
+  dañoDe,
   punteriaArma,
   confundido,
   DAÑO_ATAQUE,
@@ -92,6 +93,36 @@ const SIN_LOG: Entrada[] = [];
  * pleno combate, con miedo encima el botón decía 70% y la ficha del mismo item
  * decía 90%.
  */
+/**
+ * Un número de daño tuyo, con el extra separado y en su color.
+ *
+ * `8 (6 + 2)`: lo que hace, lo que hacía, y de dónde sale la diferencia. El
+ * extra sale de vencer profesores, del café, y de lo que te resten los
+ * defectos — todo junto, porque todo se aplica junto.
+ *
+ * Va en oro, que es el color con el que la recompensa anuncia ese bonus cuando
+ * lo ganás; si el extra fuera negativo va en malo, que es el color de lo que te
+ * saca. Cuando no hay extra se muestra el número solo: un `(6 + 0)` sería ruido.
+ */
+function Golpe({ state, base }: { state: State; base: number }) {
+  const total = dañoDe(state, base);
+  const extra = total - base;
+  if (extra === 0) return <>{total}</>;
+  return (
+    <>
+      {total}{" "}
+      <span className="text-dim">
+        ({base}{" "}
+        <span className={extra > 0 ? "text-oro" : "text-malo"}>
+          {extra > 0 ? "+" : "−"}
+          {Math.abs(extra)}
+        </span>
+        )
+      </span>
+    </>
+  );
+}
+
 function pctDe(state: State, base: number): number {
   return Math.round(punteria(state, base) * 100);
 }
@@ -1095,7 +1126,7 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
         <Seccion titulo="ARMAS" vacio="Con las manos.">
           {j.armas.map((id) => (
             <Ficha key={id} icono={ICONOS_ACCION.arma} tono="text-oro" nombre={ARMAS[id].nombre}>
-              {ARMAS[id].daño} de daño · acierta{" "}
+              <Golpe state={state} base={ARMAS[id].daño} /> de daño · acierta{" "}
               {Math.round(punteriaArma(state, id) * 100)} de cada 100 ·{" "}
               {ARMAS[id].infinita
                 ? "no se gasta"
@@ -1119,8 +1150,14 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
               cantidad={n}
               etiqueta={NOMBRE_RAREZA[ITEMS[id].rareza]}
             >
-              {ITEMS[id].descripcion} · acierta {pctDe(state, ITEMS[id].precision)} de
-              cada 100 · no gasta el turno
+              {ITEMS[id].descripcion}
+              {!!ITEMS[id].efecto.daño && (
+                <>
+                  {" "}
+                  <Golpe state={state} base={ITEMS[id].efecto.daño} /> de daño.
+                </>
+              )}{" "}
+              · acierta {pctDe(state, ITEMS[id].precision)} de cada 100 · no gasta el turno
             </Ficha>
           ))}
         </Seccion>
@@ -1726,14 +1763,24 @@ function Combate({
       ref: id,
       key: `i${i}`,
       icono: ICONOS_ITEM[id],
-      texto: `${ITEMS[id].nombre} · ${pct(ITEMS[id].precision)}% — ${ITEMS[id].descripcion}`,
+      texto: (
+        <>
+          {ITEMS[id].nombre} · {pct(ITEMS[id].precision)}% — {ITEMS[id].descripcion}
+          {!!ITEMS[id].efecto.daño && (
+            <>
+              {" "}
+              <Golpe state={state} base={ITEMS[id].efecto.daño} /> de daño.
+            </>
+          )}
+        </>
+      ),
       clase: tonoItem(id),
     })),
     ...j.sombras.map((id, i) => ({
       ref: `sombra:${id}`,
       key: `s${i}`,
       icono: ICONOS_EFECTO.confusion,
-      texto: `sombra de ${ENEMIGOS[id].nombre} — te saca los estados que tengas encima`,
+      texto: <>sombra de {ENEMIGOS[id].nombre} — te saca los estados que tengas encima</>,
       clase: "text-sueno",
     })),
     ...j.poderes
@@ -1742,7 +1789,18 @@ function Combate({
         ref: `poder:${id}`,
         key: id,
         icono: ICONOS_ACCION.usar,
-        texto: `${PODERES[id].nombre} ×${usosPoder(state, id)} · ${pct(PODERES[id].precision)}% — ${PODERES[id].texto}`,
+        texto: (
+          <>
+            {PODERES[id].nombre} ×{usosPoder(state, id)} · {pct(PODERES[id].precision)}% —{" "}
+            {PODERES[id].texto}
+            {!!PODERES[id].efecto.daño && (
+              <>
+                {" "}
+                <Golpe state={state} base={PODERES[id].efecto.daño} /> de daño.
+              </>
+            )}
+          </>
+        ),
         clase: PODERES[id].efecto.vida ? "text-salud" : "text-sueno",
       })),
   ];
@@ -1836,13 +1894,22 @@ function Combate({
         <Boton
           label="ATACAR"
           icono={ICONOS_ACCION.atacar}
-          sub={`${DAÑO_ATAQUE} · ${pct(PRECISION_ATAQUE)}%`}
+          sub={
+            <>
+              <Golpe state={state} base={DAÑO_ATAQUE} /> · {pct(PRECISION_ATAQUE)}%
+            </>
+          }
           onClick={() => act("atacar")}
         />
         <Boton
           label="BLOQUEAR"
           icono={ICONOS_ACCION.bloquear}
-          sub={`para todo y devolvés ${bloqueoDe(state).daño} · ${pct(bloqueoDe(state).precision)}%`}
+          sub={
+            <>
+              para todo y devolvés <Golpe state={state} base={bloqueoDe(state).daño} /> ·{" "}
+              {pct(bloqueoDe(state).precision)}%
+            </>
+          }
           onClick={() => act("bloquear")}
         />
         <Boton
@@ -1872,7 +1939,7 @@ function Combate({
               className="flex w-full items-center gap-2 text-left text-sm text-oro hover:text-foreground"
             >
               <Pixeles data={ICONOS_ACCION.arma} clase="w-3.5 shrink-0" />
-              {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
+              {ARMAS[id].nombre} — <Golpe state={state} base={ARMAS[id].daño} /> de daño ·{" "}
               {Math.round(punteriaArma(state, id) * 100)}% · {usosTexto(state, id)} usos
               {ARMAS[id].critico > 0 && ` · ${Math.round(ARMAS[id].critico * 100)}% crítico`}
             </button>
@@ -1915,7 +1982,8 @@ function Boton({
   onClick,
 }: {
   label: string;
-  sub?: string;
+  /** Admite marcado: el daño lleva el extra en otro color. */
+  sub?: React.ReactNode;
   /** El dibujo va al lado del texto, no en lugar de él. */
   icono?: string[];
   tono?: string;
@@ -1938,7 +2006,16 @@ function Boton({
 }
 
 /** Cómo se llama cada cosa que sacaste del aula, y qué hace. */
-function describirBotin(b: State["botin"][number]): {
+/**
+ * Recibe el estado porque los números de una recompensa son los que va a hacer
+ * en tu mano, no los de la ficha: si venciste un profesor, el arma que acabás
+ * de encontrar pega más de lo que dice su ficha desde el momento en que la
+ * agarrás.
+ */
+function describirBotin(
+  state: State,
+  b: State["botin"][number],
+): {
   nombre: string;
   que: string;
   como: string;
@@ -1952,8 +2029,10 @@ function describirBotin(b: State["botin"][number]): {
         icono: ICONOS_ITEM[b.id],
         tono: tonoItem(b.id),
         nombre: `${it.nombre} (${NOMBRE_RAREZA[it.rareza]})`,
-        que: it.descripcion,
-        como: `Se usa desde USAR y no gasta el turno. Se gasta para siempre: acierta ${Math.round(it.precision * 100)} de cada 100 veces.`,
+        que: it.efecto.daño
+          ? `${it.descripcion} ${dañoDe(state, it.efecto.daño)} de daño.`
+          : it.descripcion,
+        como: `Se usa desde USAR y no gasta el turno. Se gasta para siempre: acierta ${pctDe(state, it.precision)} de cada 100 veces.`,
       };
     }
     case "arma": {
@@ -1962,7 +2041,7 @@ function describirBotin(b: State["botin"][number]): {
         icono: ICONOS_ACCION.arma,
         tono: "text-oro",
         nombre: a.nombre,
-        que: `${a.daño} de daño, acierta ${Math.round(a.precision * 100)} de cada 100.`,
+        que: `${dañoDe(state, a.daño)} de daño, acierta ${pctDe(state, a.precision)} de cada 100.`,
         como: a.infinita
           ? `No se gasta nunca.${a.perdida ? ` Aunque cada golpe que entra tiene ${Math.round(a.perdida * 100)}% de que la pierdas.` : ""}`
           : `${a.usos} usos por pelea, y se recargan en la siguiente. Pierde puntería con cada golpe.`,
@@ -2141,7 +2220,7 @@ function Recompensa({
           <p className="text-sm tracking-widest text-dim">TE LLEVÁS</p>
           <ul className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1">
             {state.botin.map((b, i) => {
-              const d = describirBotin(b);
+              const d = describirBotin(state, b);
               return (
                 <li key={i} className="flex gap-3 border border-borde px-3 py-2.5">
                   <Pixeles data={d.icono} clase={`mt-1 w-5 shrink-0 ${d.tono}`} />
@@ -2166,8 +2245,9 @@ function Recompensa({
       {nueva ? (
         <div className="space-y-2 border-t border-dimmer pt-4">
           <p className="text-sm text-dim">
-            Llevás {MAX_ARMAS}. Para agarrar {ARMAS[nueva].nombre} ({ARMAS[nueva].daño} de
-            daño · {Math.round(ARMAS[nueva].precision * 100)}% ·{" "}
+            Llevás {MAX_ARMAS}. Para agarrar {ARMAS[nueva].nombre} (
+            <Golpe state={state} base={ARMAS[nueva].daño} /> de daño ·{" "}
+            {pctDe(state, ARMAS[nueva].precision)}% ·{" "}
             {ARMAS[nueva].infinita ? "no se gasta" : `${ARMAS[nueva].usos} usos`}) tenés
             que soltar algo.
           </p>
@@ -2177,8 +2257,8 @@ function Recompensa({
               onClick={() => dispatch({ type: "canjear-arma", dejar: id })}
               className="block w-full border border-dimmer p-2 text-left text-sm hover:border-agua"
             >
-              soltar {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
-              {Math.round(ARMAS[id].precision * 100)}% ·{" "}
+              soltar {ARMAS[id].nombre} — <Golpe state={state} base={ARMAS[id].daño} /> de
+              daño · {Math.round(punteriaArma(state, id) * 100)}% ·{" "}
               {ARMAS[id].infinita ? "no se gasta" : `${ARMAS[id].usos} usos`}
             </button>
           ))}
