@@ -200,6 +200,15 @@ export function precisionArma(state: State, armaId: string): number {
   return Math.max(PRECISION_MINIMA, arma.precision - usados * arma.desgaste);
 }
 
+/**
+ * Lo que acierta un arma tuya **ahora mismo**: con el desgaste de esta pelea y
+ * con el miedo si lo tenés. Es la única cuenta correcta para mostrar en
+ * pantalla, y existe como función para que no haya dos versiones dando vueltas.
+ */
+export function punteriaArma(state: State, armaId: string): number {
+  return punteria(state, precisionArma(state, armaId));
+}
+
 /** Las armas que podés usar ahora mismo. */
 export function armasUsables(state: State): string[] {
   return state.jugador.armas.filter((id) => usosArma(state, id) > 0);

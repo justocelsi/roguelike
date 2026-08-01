@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ARMAS, ENEMIGOS, EXPLICACION_EFECTO, ITEMS } from "@/game/content";
 import {
   CICLOS,
+  punteriaArma,
   confundido,
   DAÑO_ATAQUE,
   bloqueoDe,
@@ -15,7 +16,6 @@ import {
   MAX_ARMAS,
   nombreDe,
   PRECISION_ATAQUE,
-  precisionArma,
   puedeHuir,
   reduce,
   usosArma,
@@ -82,6 +82,19 @@ const BEAT_PREMIO = 1700;
 const FUNDIDO = 620;
 
 const SIN_LOG: Entrada[] = [];
+
+/**
+ * El porcentaje que se muestra de cualquier cosa que hagas vos. **Uno solo para
+ * toda la interfaz.**
+ *
+ * Había dos versiones: la del combate, que descontaba el miedo, y la del
+ * inventario, que mostraba el número de fábrica. Como el inventario se abre en
+ * pleno combate, con miedo encima el botón decía 70% y la ficha del mismo item
+ * decía 90%.
+ */
+function pctDe(state: State, base: number): number {
+  return Math.round(punteria(state, base) * 100);
+}
 
 export default function Juego() {
   const [state, setState] = useState<State | null>(null);
@@ -1082,8 +1095,8 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
         <Seccion titulo="ARMAS" vacio="Con las manos.">
           {j.armas.map((id) => (
             <Ficha key={id} icono={ICONOS_ACCION.arma} tono="text-oro" nombre={ARMAS[id].nombre}>
-              {ARMAS[id].daño} de daño · acierta {Math.round(ARMAS[id].precision * 100)} de
-              cada 100 ·{" "}
+              {ARMAS[id].daño} de daño · acierta{" "}
+              {Math.round(punteriaArma(state, id) * 100)} de cada 100 ·{" "}
               {ARMAS[id].infinita
                 ? "no se gasta"
                 : `${ARMAS[id].usos} usos por pelea, se recargan en la siguiente`}
@@ -1106,7 +1119,7 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
               cantidad={n}
               etiqueta={NOMBRE_RAREZA[ITEMS[id].rareza]}
             >
-              {ITEMS[id].descripcion} · acierta {Math.round(ITEMS[id].precision * 100)} de
+              {ITEMS[id].descripcion} · acierta {pctDe(state, ITEMS[id].precision)} de
               cada 100 · no gasta el turno
             </Ficha>
           ))}
@@ -1134,7 +1147,8 @@ function Inventario({ state, onCerrar }: { state: State; onCerrar: () => void })
               tono={PODERES[id].efecto.vida ? "text-salud" : "text-sueno"}
               nombre={PODERES[id].nombre}
             >
-              {PODERES[id].texto} · {PODERES[id].usos} usos por pelea
+              {PODERES[id].texto} · acierta {pctDe(state, PODERES[id].precision)} de cada
+              100 · {PODERES[id].usos} usos por pelea
             </Ficha>
           ))}
           {pasivosDeSueño.map((id) => (
@@ -1697,7 +1711,7 @@ function Combate({
   const ciego = !veElAviso(state);
   const losAvisos = avisos(state);
   // El mismo número que va a girar en el reloj: sale de la misma función.
-  const pct = (p: number) => Math.round(punteria(state, p) * 100);
+  const pct = (p: number) => pctDe(state, p);
 
   const act = (accion: Accion, ref?: string) => {
     if (contando) return;
@@ -1859,7 +1873,7 @@ function Combate({
             >
               <Pixeles data={ICONOS_ACCION.arma} clase="w-3.5 shrink-0" />
               {ARMAS[id].nombre} — {ARMAS[id].daño} de daño ·{" "}
-              {pct(precisionArma(state, id))}% · {usosTexto(state, id)} usos
+              {Math.round(punteriaArma(state, id) * 100)}% · {usosTexto(state, id)} usos
               {ARMAS[id].critico > 0 && ` · ${Math.round(ARMAS[id].critico * 100)}% crítico`}
             </button>
           ))}

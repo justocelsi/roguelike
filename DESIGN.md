@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 27 invariantes automáticas y 44 comprobaciones de números
+Verificado con 28 invariantes automáticas y 44 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Nada aparece de un frame al otro

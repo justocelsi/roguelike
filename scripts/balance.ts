@@ -342,6 +342,20 @@ function reglas() {
         fallo("el miedo sólo actúa si lo tenés");
       }
       /*
+       * Fuera del combate no quedan estados encima.
+       *
+       * De eso depende que la pantalla de recompensa y el inventario puedan
+       * mostrar la puntería de fábrica de un arma o un item: si ahí pudiera
+       * haber miedo, esos números estarían mintiendo como mentía el inventario
+       * abierto en pleno combate.
+       */
+      const muestraNumeros =
+        s.fase === "pasillo" || s.fase === "recompensa" || s.fase === "juego";
+      if (muestraNumeros && s.efectos.length) {
+        fallo("fuera del combate no te queda nada encima", `${s.fase}: ${s.efectos.length}`);
+      }
+
+      /*
        * El escudo se ve hasta que se rompe, y se rompe una sola vez.
        *
        * La marca de "estás cubierto" sale de la foto de cada evento, no del
@@ -584,6 +598,7 @@ function reglas() {
     "el escudo se gasta de a uno",
     "el escudo no se apaga sin decirlo",
     "se probaron escudos de verdad",
+    "fuera del combate no te queda nada encima",
   ];
   let todo = true;
   for (const r of REGLAS) {
