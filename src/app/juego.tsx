@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { ARMAS, ENEMIGOS, EXPLICACION_EFECTO, ITEMS } from "@/game/content";
+import { ARMAS, ENEMIGOS, EXPLICACION_EFECTO, ITEMS, MATERIAS } from "@/game/content";
 import {
   CICLOS,
   dañoDe,
@@ -38,6 +38,13 @@ import {
 import { preguntaDe, type Minijuego } from "@/game/minijuegos";
 import { DEFECTOS, PODERES } from "@/game/poderes";
 import {
+  alternarMudo,
+  despertarSonido,
+  estaMudo,
+  sonar,
+  ticsDeReloj,
+} from "./sonido";
+import {
   ICONOS,
   ICONOS_ACCION,
   ICONOS_EFECTO,
@@ -45,6 +52,42 @@ import {
   SPRITES,
 } from "@/game/sprites";
 import type { Accion, Action, Entrada, Intencion, State } from "@/game/types";
+
+/**
+ * La curva con la que frena la aguja del reloj. Vive acá porque la usan dos
+ * cosas que tienen que estar sincronizadas: el CSS que mueve la aguja y el
+ * cálculo de cuándo suena cada tic.
+ */
+const CURVA_AGUJA: [number, number, number, number] = [0.1, 0.72, 0.16, 1];
+
+/**
+ * El sonido de un evento del combate, deducido de lo que el evento ya dice.
+ *
+ * No hace falta que el motor mande un nombre de sonido: el evento trae la foto
+ * de las vidas, así que la dirección del daño se sabe restando. Lo único que
+ * necesita marca propia es el bloqueo, porque un bloqueo que sale no deja
+ * rastro en ninguna vida.
+ */
+function sonidoDe(e: Entrada, previo: Entrada | null): Parameters<typeof sonar>[0] | null {
+  if (e.escudoUsado) return "escudo";
+  if (e.icono) return "estado";
+  if (e.bloqueo) return "bloqueo";
+
+  const antesVos = previo?.vidaJugador;
+  const antesEso = previo?.vidaEnemigo;
+  if (e.vidaJugador !== undefined && antesVos !== undefined && e.vidaJugador < antesVos) {
+    return "recibis";
+  }
+  if (e.vidaEnemigo !== undefined && antesEso !== undefined && e.vidaEnemigo < antesEso) {
+    // Cuanto más fuerte el golpe, más grave suena. Se nota sin leer el número.
+    return antesEso - e.vidaEnemigo >= 15 ? "arma" : "golpe";
+  }
+  if (e.tirada && !e.tirada.salio) return "fallo";
+  if (/Guardás|Agarrás|deja de estar/.test(e.texto)) {
+    return e.texto.includes("deja de estar") ? "muere" : "hallazgo";
+  }
+  return null;
+}
 
 /** Cuánto dura un evento común en pantalla. */
 const RITMO = 780;
@@ -152,6 +195,10 @@ export default function Juego() {
   );
 
   const empezar = () => {
+    // Los navegadores no dejan sonar hasta que el jugador toca algo, y esto es
+    // lo primero que toca.
+    despertarSonido();
+    sonar("boton");
     pos.current = null;
     setState(initialState());
     setContandoHistoria(true);
@@ -915,9 +962,13 @@ function Umbral({ dato, onFin }: { dato: DatoUmbral; onFin: () => void }) {
       setSaliendo(true);
       return;
     }
+    // La luz subiendo, lo que hay adentro tomando forma, y lo que había.
+    if (paso === 1) sonar("umbral");
+    else if (paso === 2) sonar(dato.que === "pelea" ? "enemigo" : "revelar");
+    else if (paso === 3) sonar("hallazgo");
     const t = setTimeout(() => setPaso((p) => p + 1), beats[paso]);
     return () => clearTimeout(t);
-  }, [paso, beats.length]);
+  }, [paso, beats.length, dato.que]);
 
   /*
    * El aula no aparece de un frame al otro. Antes el umbral se desmontaba en
@@ -1031,6 +1082,30 @@ function Umbral({ dato, onFin }: { dato: DatoUmbral; onFin: () => void }) {
         )}
       </div>
     </div>
+  );
+}
+
+/**
+ * El interruptor del sonido. Vive al lado del bolsillo porque es lo mismo: algo
+ * que se mira de reojo y no interrumpe. La preferencia queda guardada, así que
+ * quien juega en silencio lo decide una sola vez.
+ */
+function Silencio() {
+  const [mudo, setMudo] = useState(false);
+  // El estado real vive en el módulo de sonido, que arranca recién en el primer
+  // gesto; se lee al montar para no llegar desincronizado.
+  useEffect(() => setMudo(estaMudo()), []);
+  return (
+    <button
+      onClick={() => setMudo(alternarMudo())}
+      title={mudo ? "Prender el sonido" : "Silenciar"}
+      aria-label={mudo ? "Prender el sonido" : "Silenciar"}
+      className={`shrink-0 border border-borde px-2.5 py-1 tracking-widest transition-colors hover:border-agua hover:text-foreground ${
+        mudo ? "text-dim" : "text-agua"
+      }`}
+    >
+      {mudo ? "🔇" : "🔊"}
+    </button>
   );
 }
 
@@ -1310,14 +1385,17 @@ function Cabecera({
           CICLO {state.ciclo}/{CICLOS}
         </span>
         {onInventario && (
-          <button
-            onClick={onInventario}
-            title="Ver todo lo que llevás"
-            className="flex shrink-0 items-center gap-1.5 border border-borde px-2.5 py-1 tracking-widest text-dim transition-colors hover:border-agua hover:text-foreground"
-          >
-            <Pixeles data={ICONOS_ACCION.usar} clase="w-3 shrink-0 text-oro" />
-            BOLSILLO
-          </button>
+          <>
+            <Silencio />
+            <button
+              onClick={onInventario}
+              title="Ver todo lo que llevás"
+              className="flex shrink-0 items-center gap-1.5 border border-borde px-2.5 py-1 tracking-widest text-dim transition-colors hover:border-agua hover:text-foreground"
+            >
+              <Pixeles data={ICONOS_ACCION.usar} clase="w-3 shrink-0 text-oro" />
+              BOLSILLO
+            </button>
+          </>
         )}
       </div>
       {/* Las armas en su propio renglón: con tres puestas la lista es larga y
@@ -1431,6 +1509,9 @@ function useSecuencia(log: Entrada[], pausado = false) {
     );
   }, [log]);
 
+  /** Lo último que se mostró, para saber en qué dirección se movió una vida. */
+  const anterior = useRef<Entrada | null>(null);
+
   useEffect(() => {
     if (cola.length === 0) {
       setActual(null);
@@ -1441,6 +1522,15 @@ function useSecuencia(log: Entrada[], pausado = false) {
     if (pausado) return;
     const [primero, ...resto] = cola;
     setActual(primero.entrada);
+    /*
+     * El sonido va acá y no en el despacho: el motor resuelve el turno entero
+     * de un saque, así que sonar ahí sería escuchar el golpe que te mata
+     * mientras la pantalla todavía muestra tu propio ataque. Es la misma regla
+     * que las barras de vida.
+     */
+    const s = sonidoDe(primero.entrada, anterior.current);
+    if (s) sonar(s);
+    anterior.current = primero.entrada;
     const t = setTimeout(() => setCola(resto), primero.dura);
     return () => clearTimeout(t);
   }, [cola, pausado]);
@@ -1633,8 +1723,20 @@ function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
     // Siempre para adelante: vueltas enteras sobre lo ya acumulado. Una aguja
     // que retrocede se lee como un error, no como suspenso.
     const desde = ((acumulado.current % 360) + 360) % 360;
-    acumulado.current += 3 * 360 + ((destino - desde + 360) % 360);
+    const recorrido = 3 * 360 + ((destino - desde + 360) % 360);
+    acumulado.current += recorrido;
     setAngulo(acumulado.current);
+
+    /*
+     * Y suena mientras gira. Los tics arrancan pegados y se van separando hasta
+     * que queda uno solo colgado justo antes de que pare: ese último silencio es
+     * toda la tensión de la tirada. Salen de la misma curva que mueve la aguja,
+     * así que no se pueden desfasar.
+     */
+    const relojes = ticsDeReloj(GIRO, recorrido, CURVA_AGUJA).map((ms) =>
+      setTimeout(() => sonar("tic"), ms),
+    );
+    return () => relojes.forEach(clearTimeout);
   }, [tirada]);
 
   const activo = !!tirada;
@@ -1674,7 +1776,7 @@ function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
             background: activo ? "var(--foreground)" : "var(--dim)",
             // Arranca de golpe y frena largo: con una desaceleración corta el
             // final se sentiría como un tirón.
-            transition: `transform ${GIRO}ms cubic-bezier(0.1, 0.72, 0.16, 1), background 700ms`,
+            transition: `transform ${GIRO}ms cubic-bezier(${CURVA_AGUJA.join(",")}), background 700ms`,
           }}
         />
         <div className="absolute left-1/2 top-1/2 h-1.5 w-1.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-foreground" />
@@ -1733,6 +1835,23 @@ function Combate({
     vidaPrev.current = vidaJugadorVista;
   }, [vidaJugadorVista]);
 
+  /*
+   * Agonía: abajo de un cuarto de vida se escucha el corazón y el borde de la
+   * pantalla late con él.
+   *
+   * Es lo único que corre solo, sin que pase nada. Un roguelike se recuerda por
+   * las veces que zafaste por poco, y para que zafar por poco se sienta, antes
+   * tiene que sentirse que estabas por morir. El resto de la interfaz reacciona
+   * a eventos; esto es un estado, y es el único que se gana serlo.
+   */
+  const agonizando = vidaJugadorVista > 0 && vidaJugadorVista <= state.jugador.vidaMax * 0.25;
+  useEffect(() => {
+    if (!agonizando) return;
+    sonar("latido");
+    const t = setInterval(() => sonar("latido"), 1500);
+    return () => clearInterval(t);
+  }, [agonizando]);
+
   if (!c) return null;
   const enemigo = ENEMIGOS[c.enemigoId];
   const intencion = enemigo.patron[c.paso % enemigo.patron.length];
@@ -1752,6 +1871,7 @@ function Combate({
 
   const act = (accion: Accion, ref?: string) => {
     if (contando) return;
+    sonar("boton");
     setMenu(null);
     dispatch({ type: "combate", accion, ref });
   };
@@ -1809,6 +1929,10 @@ function Combate({
 
   return (
     <section className="flex min-h-0 flex-1 flex-col gap-3">
+      {agonizando && (
+        <div className="agonia pointer-events-none fixed inset-0 z-30" aria-hidden />
+      )}
+
       {/* Destello en toda la pantalla: te entró. */}
       {herido > 0 && (
         <div
@@ -2339,18 +2463,68 @@ function Sueño({ state, dispatch }: { state: State; dispatch: (a: Action) => vo
 
 // --- final ----------------------------------------------------------------
 
+/**
+ * El final, contado como una historia y no como un cartel.
+ *
+ * Antes decía hasta dónde llegaste y nada más. Una run que no deja nada atrás
+ * no da ganas de empezar otra: lo que hace apretar OTRA VEZ no es el botón sino
+ * acordarte de algo puntual —quién te mató, cuánto te faltaba, lo que tenías en
+ * el bolsillo y no usaste—.
+ *
+ * Esa última línea es a propósito la más incómoda. Morirte con tres items
+ * guardados es la lección más útil que da el juego, y sólo se aprende si te la
+ * dicen en la cara.
+ */
+/**
+ * De qué materia es un enemigo. Al morir el combate ya no existe —el motor lo
+ * limpia— así que la única forma de dibujar al que te alcanzó es volver a
+ * buscarlo por su id.
+ */
+function materiaDe(enemigoId: string): string {
+  if (enemigoId.startsWith("prof_")) return enemigoId.slice(5);
+  const m = Object.values(MATERIAS).find((x) => x.enemigos.includes(enemigoId));
+  return m?.id ?? "biologia";
+}
+
 function Final({ state, onRestart }: { state: State; onRestart: () => void }) {
   const muerto = state.fase === "muerto";
+  const j = state.jugador;
+  const guardados = j.items.length + j.sombras.length;
   return (
     <section className={`entra-pantalla space-y-5 border p-6 ${muerto ? "border-malo" : "border-agua"}`}>
       <p className={`text-sm tracking-widest ${muerto ? "text-malo" : "text-agua"}`}>
         {muerto ? "NO SONÓ NINGÚN TIMBRE" : "SALISTE"}
       </p>
       <p className="text-sm leading-relaxed">{state.final}</p>
+
+      {muerto && state.matador && (
+        <div className="flex items-center gap-4 border-y border-borde-suave py-4">
+          <EnPie materiaId={materiaDe(state.matador)} />
+          <div className="min-w-0">
+            <p className="text-xs tracking-[0.35em] text-dim">TE ALCANZÓ</p>
+            <p className="text-lg leading-tight text-malo">
+              {ENEMIGOS[state.matador].nombre}
+            </p>
+          </div>
+        </div>
+      )}
+
       <div className="space-y-1 border-t border-dimmer pt-4 text-sm text-dim">
         <p>
-          Llegaste al ciclo {state.ciclo} de {CICLOS}.
+          Ciclo <span className="tabular-nums text-foreground">{state.ciclo}</span> de {CICLOS} ·{" "}
+          <span className="tabular-nums text-foreground">{state.profesoresVencidos}</span>{" "}
+          {state.profesoresVencidos === 1 ? "profesor vencido" : "profesores vencidos"}
         </p>
+        <p>
+          Abriste <span className="tabular-nums text-foreground">{state.aulasHechas}</span>{" "}
+          {state.aulasHechas === 1 ? "aula" : "aulas"}.
+        </p>
+        {muerto && guardados > 0 && (
+          <p className="text-oro">
+            Te quedaban <span className="tabular-nums">{guardados}</span>{" "}
+            {guardados === 1 ? "cosa" : "cosas"} sin usar.
+          </p>
+        )}
         {state.jugador.defectos.length > 0 && (
           <p>Te llevaste: {state.jugador.defectos.map((d) => DEFECTOS[d].nombre).join(", ")}.</p>
         )}

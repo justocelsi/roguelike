@@ -222,6 +222,12 @@ export type Entrada = {
   /** Este evento es el escudo interponiéndose y gastándose. */
   escudoUsado?: boolean;
   /**
+   * Y éste es un bloqueo que salió. Va marcado porque no deja rastro en las
+   * vidas —un bloqueo que sale para el golpe entero— así que la interfaz no
+   * tiene cómo darse cuenta sola de que pasó algo.
+   */
+  bloqueo?: boolean;
+  /**
    * Quién lo hizo. La interfaz mete una pausa larga cuando el turno cambia de
    * manos, para que se lea como una secuencia y no como un bloque.
    */
@@ -285,6 +291,13 @@ export type State = {
 
   log: Entrada[];
   final: string | null;
+  /**
+   * Lo que hiciste en esta run, para poder contárselo al jugador cuando
+   * termina. La pantalla de muerte decía cuánto habías llegado y nada más, y
+   * una run que no deja una historia atrás no da ganas de empezar otra.
+   */
+  matador: string | null;
+  aulasHechas: number;
 };
 
 export type Action =

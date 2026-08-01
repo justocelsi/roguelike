@@ -229,7 +229,12 @@ function correr(e: Estilo) {
         }
       } else quieto = 0;
     }
-    if (s.fase === "muerto") muertes++;
+    if (s.fase === "muerto") {
+      muertes++;
+      // La pantalla final cuenta quién te alcanzó, así que siempre tiene que
+      // haber alguien: morir sin matador dejaría un hueco en esa historia.
+      if (!s.matador) contarCorte("moriste sin que nada te matara");
+    }
     else if (s.fase !== "fin") contarCorte(motivo ?? `se quedó en "${s.fase}"`);
     ciclo += s.ciclo;
   }

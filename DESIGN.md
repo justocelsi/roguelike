@@ -391,6 +391,70 @@ Y obligó a algo mejor: **una acción, una tirada.** Antes atacar tiraba dos vec
 —una por el miedo y otra por la puntería— y la pantalla mostraba el producto.
 Ahora hay un solo número y una sola tirada, que es la que gira en el reloj.
 
+## Qué hace que te quedes
+
+Cuatro cosas, y ninguna agrega una mecánica. Todas trabajan sobre lo que ya
+pasaba: lo hacen **sentir**.
+
+### El sonido, sintetizado
+
+Sin un solo archivo. Es la misma decisión que los sprites —pixel art como
+grillas de texto en CSS— llevada al audio: cada sonido son cuatro osciladores y
+una envolvente. El repo pesa lo mismo con sonido que sin él.
+
+Todo es corto, seco y grave. El colegio está en silencio y lo que se escucha son
+cosas puntuales pasando cerca tuyo; un sonido que dura más que su evento se
+convierte en música, y la música acá taparía el silencio que hace que lo demás
+se escuche. **No hay loop de fondo a propósito.**
+
+Se lee de oído sin mirar: lo tuyo es seco y con cuerpo, lo del enemigo es más
+grave y más sucio, el bloqueo es metal, lo que se rompe es cristal, y errar no
+suena a casi nada —que es exactamente lo que pasó—. Cuanto más fuerte el golpe,
+más abajo suena.
+
+Y **suena con el evento que se muestra, no cuando el motor resuelve el turno**.
+Es la misma regla que las barras de vida: el motor resuelve la mano entera de un
+saque, así que sonar ahí sería escuchar el golpe que te mata mientras la pantalla
+todavía muestra tu propio ataque.
+
+### El reloj haciendo tic
+
+El mejor recurso de tensión que existe es un resultado ya decidido que todavía
+no te dijeron. La aguja arranca disparada y frena de a poco, así que los tics
+empiezan pegados y se van separando hasta que queda **uno solo colgado justo
+antes de que pare**. Ese último silencio es toda la tirada.
+
+Los tiempos salen de la misma curva que mueve la aguja en el CSS, evaluada en
+JavaScript. Si fueran dos curvas distintas se desfasarían, y un tic que no cae
+con la aguja se nota enseguida.
+
+### La agonía
+
+Abajo de un cuarto de vida se escucha el corazón y el borde de la pantalla late
+con él.
+
+**Un roguelike se recuerda por las veces que zafaste por poco.** Para que zafar
+por poco se sienta, antes tiene que sentirse que estabas por morir. Es lo único
+de la interfaz que corre solo, sin que pase nada: el resto reacciona a eventos,
+esto es un estado, y es el único que se gana serlo.
+
+### El final, contado
+
+Antes decía hasta dónde llegaste y nada más. Ahora dice **quién te alcanzó**,
+con su sprite; cuántas aulas abriste; cuántos profesores tiraste; y —la línea
+más incómoda a propósito— **cuántas cosas te quedaban sin usar**.
+
+Morirte con tres items guardados es la lección más útil que da el juego y sólo
+se aprende si te la dicen en la cara. Lo que hace apretar OTRA VEZ no es el botón
+sino acordarte de algo puntual.
+
+### Lo que se decidió no hacer
+
+- **Puntaje, combos, rachas.** Convierten jugar con creatividad en optimizar un
+  número, que es exactamente lo contrario de lo que se busca acá.
+- **Música de fondo.** Aplana el silencio del que dependen los otros sonidos.
+- **Sonido para todo.** Lo que suena siempre deja de escucharse.
+
 ## Estética
 
 Oscuro con verde agua, híbrido pixel/brutalista. Los sprites son grillas de

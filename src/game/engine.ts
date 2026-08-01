@@ -302,6 +302,7 @@ function logEstado(
     aviso?: boolean;
     tirada?: Entrada["tirada"];
     escudoUsado?: boolean;
+    bloqueo?: boolean;
   },
 ): Entrada[] {
   return [
@@ -534,7 +535,7 @@ function turnoEnemigo(
               daño > 0 ? `Lo bloqueás. Sólo −${daño}.` : "Lo bloqueás. No te toca.",
               "bueno",
               undefined,
-              delBloqueo,
+              { ...delBloqueo, bloqueo: true },
             ),
           };
         } else if (cubierto) {
@@ -583,7 +584,7 @@ function turnoEnemigo(
           "Lo bloqueás. No te llega a agarrar, pero no hubo golpe que devolver.",
           "bueno",
           undefined,
-          delBloqueo,
+          { ...delBloqueo, bloqueo: true },
         ),
       };
     } else if (!acierta) {
@@ -707,6 +708,7 @@ function cerrarTurno(state: State, rng: Rng): State {
       combate: null,
       mundo: null,
       final: "No sonó ningún timbre.",
+      matador: s.combate?.enemigoId ?? null,
     };
   }
   // El contraataque puede haber sido el golpe final.
@@ -841,6 +843,8 @@ export function initialState(seed: number = randomSeed()): State {
     botin: [],
     log: [{ texto: "Hace tres días que no dormís bien. Sonó el timbre.", tipo: "neutral" }],
     final: null,
+    matador: null,
+    aulasHechas: 0,
   };
   return { ...base, mundo: nuevoPasillo(base, rng), seed: rng.seed };
 }
@@ -865,6 +869,7 @@ function apply(state: State, action: Action, rng: Rng): State {
       const enemigo = ENEMIGOS[puerta.enemigoId];
       const vidaEnemigo = Math.round(enemigo.vida * escalaVida(state));
 
+      const conteo = { aulasHechas: state.aulasHechas + 1 };
       const mundo: Mundo = {
         ...state.mundo,
         puertas: state.mundo.puertas.map((p) =>
@@ -878,6 +883,7 @@ function apply(state: State, action: Action, rng: Rng): State {
         const cabe = state.jugador.items.length < 6 && !!itemId;
         return {
           ...state,
+          ...conteo,
           fase: "recompensa",
           mundo,
           materiaActual: puerta.materiaId,
@@ -902,6 +908,7 @@ function apply(state: State, action: Action, rng: Rng): State {
         const mini = armarMinijuego(rng, state.jugador.sombras);
         return {
           ...state,
+          ...conteo,
           fase: "juego",
           mundo,
           minijuego: mini,
@@ -916,6 +923,7 @@ function apply(state: State, action: Action, rng: Rng): State {
 
       return {
         ...state,
+        ...conteo,
         fase: "combate",
         mundo,
         materiaActual: puerta.materiaId,

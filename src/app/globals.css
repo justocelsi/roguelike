@@ -374,6 +374,28 @@ body {
   animation: latir-halo 2.4s ease-in-out infinite;
 }
 
+/*
+ * AGONÍA. Abajo de un cuarto de vida el borde de la pantalla late en rojo, al
+ * mismo ritmo que el corazón que se escucha.
+ *
+ * Es lo más fuerte que hace la interfaz y por eso está reservado para lo único
+ * que la merece: el momento en que el próximo golpe te mata. Un roguelike se
+ * recuerda por las veces que zafaste por poco, y para que zafar por poco se
+ * sienta, primero tiene que sentirse que estabas por morir.
+ */
+@keyframes latir-borde {
+  0%,
+  100% {
+    box-shadow: inset 0 0 60px 6px rgba(226, 104, 92, 0.16);
+  }
+  50% {
+    box-shadow: inset 0 0 110px 22px rgba(226, 104, 92, 0.42);
+  }
+}
+.agonia {
+  animation: latir-borde 1.5s ease-in-out infinite;
+}
+
 @keyframes sacudir {
   0%,
   100% {
