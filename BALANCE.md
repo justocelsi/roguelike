@@ -27,7 +27,7 @@ aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 | `DAÑO_CONTRA` | **5** | `engine.ts` | Lo que devuelve un bloqueo que salió |
 | `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
 | `PASA_BLOQUEANDO` | **0** | `engine.ts` | Un bloqueo que sale no deja pasar nada |
-| `MULT_ENEMIGO` | **1.65** | `engine.ts` | Perilla global del daño enemigo |
+| `MULT_ENEMIGO` | **1.80** | `engine.ts` | Perilla global del daño enemigo |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.90** | `engine.ts` | Puntería del golpe a mano limpia |
 | `RESTA_MIEDO` | **0.20** | `engine.ts` | Puntería que te saca el miedo, restando |
@@ -60,16 +60,18 @@ minijuegos.
 
 | Estilo | Muertes | Ciclo |
 |---|---|---|
-| Guarda los items para el profesor | **51,2%** | 3,2 |
-| Calculador: decide turno a turno | 53,3% | 3,1 |
-| Pasivo: bloquea siempre que sirve | 58,7% | 3,0 |
-| Media pasada del pasillo | 60,1% | 2,9 |
-| A lo bruto: el arma que más pegue | 63,4% | 2,6 |
-| Luchador: nunca bloquea | 64,3% | 2,6 |
-| **Derecho al profesor** | **87,7%** | 1,9 |
+| Calculador: decide turno a turno | **43,3%** | 3,6 |
+| Guarda los items para el profesor | 45,3% | 3,5 |
+| Pasivo: bloquea siempre que sirve | 48,8% | 3,4 |
+| Media pasada del pasillo | 57,3% | 3,0 |
+| A lo bruto: el arma que más pegue | 62,8% | 2,6 |
+| Luchador: nunca bloquea | 62,4% | 2,6 |
+| **Derecho al profesor** | **86,0%** | 2,0 |
 
-Los cuatro estilos que piensan quedan en 51–60 y los dos que van a lo bruto en
-63–64. Saltearse el pasillo sigue siendo un error de 24 puntos.
+Los tres estilos que piensan quedan en 43–49 y los dos que nunca se cubren en
+62–63. La brecha se ensanchó al sacarle el pico de daño a los imparables:
+cubrirse pasó a servir en más turnos, así que no cubrirse nunca cuesta más.
+Saltearse el pasillo sigue siendo un error de 23 puntos.
 
 ---
 
@@ -608,6 +610,59 @@ más chico: eso solo subió las muertes unos 3 puntos.
 
 Se aceptó sin tocar `MULT_ENEMIGO`: los cuatro estilos que piensan quedan en
 51–60 y los dos que van a lo bruto en 63–64, que es la forma que se buscaba.
+
+### El imparable que era además el más fuerte
+
+Reportado jugando: *"el golpe imbloqueable de 23 de daño muy al comienzo de la
+partida es muy fuerte, o hace menos daño o aparece después"*.
+
+Medido, era peor de lo que parecía. **Los dos únicos enemigos de pasillo con un
+golpe imparable eran también los que más pegaban** —14 y 15 de base, cuando el
+rango normal va de 6 a 15— y ninguno de los dos tiene ningún otro golpe. O sea:
+contra ellos, cubrirse no servía nunca, y el golpe pegaba 23 sobre 45 de vida en
+el ciclo 1. Los remates de dos profesores llegaban a 36 y 40 sobre esos mismos
+45.
+
+**La regla que quedó:** *un golpe que no podés cubrir nunca pega más que uno que
+sí*. El costo de un imparable es que cubrirse no sirve; si además pegara más, el
+turno en que aparece no tendría respuesta.
+
+| En pantalla, ciclo 1 | Antes | Ahora |
+|---|---|---|
+| Imparable de pasillo | 23 · 25 | **18** |
+| Imparable de profesor | 33 · 36 · 40 | **32** |
+| Bloqueable de pasillo | 23 | 25 |
+| Bloqueable de profesor | 35 | 38 |
+
+**Lo que se probó y se descartó.** Sacar los imparables del ciclo 1 entero era
+la otra mitad del pedido —"o aparece después"— y funciona en los números, pero
+rompe la enseñanza: el profesor que cierra el ciclo 1 tiene un remate imparable,
+así que el primero que verías en tu vida sería el del jefe. Enseñaría que
+cubrirse siempre sirve, para romper esa regla en el peor momento posible.
+Además ensanchaba la banda de 17 a 21 puntos.
+
+**Costo medido.** Sacarles el pico bajó las muertes unos 9 puntos, y el daño
+enemigo subió de **1,65 a 1,80** para compensar. Ojo: subir esa perilla le
+devuelve el golpe a los profesores —con 1,80, el remate de 21 volvía a 38— así
+que los tres remates imparables bajaron a 18 de base para que el tope se
+sostenga después de compensar.
+
+### El contraataque que parecía roto
+
+Reportado en la misma sesión: *"devolver del bloqueo no funciona aunque haya
+bloqueado"*. Medido: de 1348 bloqueos que salieron, **695 devolvieron y 653 no**.
+
+No era un bug. Sólo se devuelve contra un golpe: cuando lo que te tiran es un
+estado no hay golpe que redirigir. La regla es deliberada —devolver también
+contra los estados hace que cubrirse sea la respuesta a todo, medido en su
+momento: pasivo 22% contra luchador 51%— pero **la pantalla no la decía en
+ningún lado**. Con la mitad de los bloqueos sin devolución, se lee como que el
+contraataque está roto.
+
+Ahora el botón de BLOQUEAR mira el aviso y dice *"para todo y devolvés 5"* o
+*"para todo, sin devolver"* según lo que venga, y el resultado explica por qué:
+*"no hubo golpe que devolver"*. Con el aviso tapado muestra la versión general,
+porque ahí tampoco sabés qué viene.
 
 ## Cómo volver atrás
 

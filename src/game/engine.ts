@@ -84,7 +84,7 @@ export const PASA_BLOQUEANDO = Number(process.env.NEXT_PUBLIC_PASA ?? 0);
  * cosas del menú y el bloqueo empezó a parar el golpe entero de verdad. Los
  * arreglos de claridad del combate le devolvieron al jugador ~15 puntos.
  */
-const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.65);
+const MULT_ENEMIGO = Number(process.env.NEXT_PUBLIC_MULT_ENEMIGO ?? 1.8);
 
 /**
  * Nada acierta siempre, de ningún lado. La regla que mantiene esto justo es
@@ -570,9 +570,21 @@ function turnoEnemigo(
        * pasivo se iba a 22% contra 51% del luchador y bloquear volvía a ser la
        * respuesta a todo.
        */
+      /*
+       * Se dice por qué no hay devolución. Cubrirse contra algo que no era un
+       * golpe frenaba el efecto y no devolvía nada, y en pantalla eso se leía
+       * como que el contraataque estaba roto: la mitad de los bloqueos que
+       * salen son contra una intención de efecto.
+       */
       s = {
         ...s,
-        log: logEstado(s, "Lo bloqueás. No te llega a agarrar.", "bueno", undefined, delBloqueo),
+        log: logEstado(
+          s,
+          "Lo bloqueás. No te llega a agarrar, pero no hubo golpe que devolver.",
+          "bueno",
+          undefined,
+          delBloqueo,
+        ),
       };
     } else if (!acierta) {
       s = { ...s, log: logEstado(s, "Lo intenta y no te agarra.", "neutral") };

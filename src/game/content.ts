@@ -153,7 +153,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 32,
     patron: [
       { tell: "Se descuelga del soporte.", tipo: "espera" },
-      { tell: "Se acomoda las manos.", tipo: "golpe", imparable: true, impacto: "Te agarra justo donde tenés lo mismo que él.", daño: 14 , precision: 0.8 },
+      { tell: "Se acomoda las manos.", tipo: "golpe", imparable: true, impacto: "Te agarra justo donde tenés lo mismo que él.", daño: 10 , precision: 0.8 },
       { tell: "Te muestra dónde te falta algo.", tipo: "efecto", efecto: "miedo" , precision: 0.85 },
     ],
   },
@@ -174,7 +174,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     vida: 22,
     patron: [
       { tell: "Empieza a burbujear.", tipo: "espera" },
-      { tell: "Se expande.", tipo: "golpe", imparable: true, impacto: "Te llega el calor antes que el ruido.", daño: 15 , precision: 0.8 },
+      { tell: "Se expande.", tipo: "golpe", imparable: true, impacto: "Te llega el calor antes que el ruido.", daño: 10 , precision: 0.8 },
       { tell: "El aire se pone denso.", tipo: "efecto", efecto: "torpeza" , precision: 0.85 },
     ],
   },
@@ -220,7 +220,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
       { tell: "Tacha algo tuyo.", tipo: "golpe", impacto: "Tacha algo que habías hecho bien.", daño: 16 , precision: 0.9 },
       { tell: "Te muestra la hoja.", tipo: "efecto", efecto: "confusion" , precision: 0.9 },
       { tell: "Te mira mientras escribe.", tipo: "efecto", efecto: "miedo", precision: 0.9 },
-      { tell: "Sigue corrigiendo.", tipo: "golpe", imparable: true, impacto: "Sigue. La hoja te queda entera en rojo.", daño: 20 , precision: 0.9 },
+      { tell: "Sigue corrigiendo.", tipo: "golpe", imparable: true, impacto: "Sigue. La hoja te queda entera en rojo.", daño: 18 , precision: 0.9 },
     ],
   },
   prof_biologia: {
@@ -233,7 +233,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
       { tell: "Señala exactamente el lugar.", tipo: "golpe", impacto: "Apoya el dedo justo donde duele.", daño: 18 , precision: 0.9 },
       { tell: "Espera a que respires.", tipo: "espera" },
       { tell: "Te toma el pulso.", tipo: "efecto", efecto: "torpeza", precision: 0.9 },
-      { tell: "Ahí.", tipo: "golpe", imparable: true, impacto: "Ahí. Sabía dónde desde antes de que entraras.", daño: 22 , precision: 0.9 },
+      { tell: "Ahí.", tipo: "golpe", imparable: true, impacto: "Ahí. Sabía dónde desde antes de que entraras.", daño: 18 , precision: 0.9 },
     ],
   },
   prof_quimica: {
@@ -279,7 +279,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
       { tell: "Ocho.", tipo: "espera" },
       { tell: "Nueve.", tipo: "efecto", efecto: "torpeza" , precision: 0.9 },
       { tell: "Te mira a vos cuando cuenta.", tipo: "efecto", efecto: "miedo", precision: 0.9 },
-      { tell: "Diez.", tipo: "golpe", imparable: true, impacto: "Diez. Se acabó el tiempo para todos.", daño: 24 , precision: 0.9 },
+      { tell: "Diez.", tipo: "golpe", imparable: true, impacto: "Diez. Se acabó el tiempo para todos.", daño: 18 , precision: 0.9 },
     ],
   },
 };

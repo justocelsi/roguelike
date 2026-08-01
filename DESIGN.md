@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 29 invariantes automáticas y 44 comprobaciones de números
+Verificado con 29 invariantes automáticas y 46 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Nada aparece de un frame al otro
@@ -205,6 +205,12 @@ contra 51% del que nunca bloquea.
 El puño es débil a propósito, y esa es la pieza que sostiene el pasillo: sin
 arma, los turnos en que no te cubrís no valen nada.
 
+**Cubrirse te protege de todo, pero sólo devolvés lo que te tiraron.** Contra un
+golpe le devolvés; contra algo que te quería dejar un estado encima no hay golpe
+que redirigir. Por eso el botón dice, mirando el aviso, si va a haber
+devolución o no: **la mitad de los bloqueos que salen son contra un estado**, y
+enterarte recién en el resultado hace que el contraataque parezca roto.
+
 **Bloquear nunca devuelve más que un ataque.** Si devolviera más, no habría
 razón para atacar cuando ves venir un golpe. Lo que impide que bloquear sea la
 respuesta a todo son dos reglas: hay **golpes imparables** que lo atraviesan, y
@@ -272,6 +278,30 @@ dos mentiras que estaban en el motor desde antes.
 **El enemigo siempre telegrafía lo que va a hacer el turno siguiente.** Todo el
 combate es leer ese aviso y decidir si pegás o te cubrís. Cubrirte en el momento
 justo es la jugada más rentable del juego; cubrirte de más es perder el turno.
+
+### Un golpe que no podés cubrir nunca pega más que uno que sí
+
+El costo de un imparable es que cubrirse no sirve. Si además pegara más, el
+turno en que aparece no tendría respuesta: ni bloquear, ni correr a matarlo.
+
+Estaba al revés. El imparable más fuerte de los enemigos de pasillo era también
+el golpe más fuerte del juego temprano —**23 en pantalla sobre 45 de vida, en el
+ciclo 1**— y los remates de dos profesores llegaban a 40 sobre esos mismos 45.
+
+Ahora, en el ciclo 1:
+
+| | Se puede cubrir | No se puede |
+|---|---|---|
+| Enemigos de pasillo | hasta 25 | hasta 18 |
+| Profesores | hasta 38 | hasta 32 |
+
+Lo que no podés bloquear es siempre la amenaza **menor**. Verificado con una
+invariante, para las dos categorías por separado.
+
+> Se probó también sacar los imparables del ciclo 1 entero, y se descartó: el
+> profesor que cierra ese ciclo tiene un remate imparable, así que el primero
+> que verías en tu vida sería el del jefe. Enseñaría que cubrirse siempre sirve
+> para romper esa regla en el peor momento posible.
 
 ### Los tres efectos
 

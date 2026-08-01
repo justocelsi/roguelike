@@ -830,6 +830,33 @@ function juegos() {
   }
   debe("todo el contenido va de a 5", sueltos.join(",") || "todo redondo", "todo redondo");
 
+  /*
+   * Un golpe que no podés cubrir nunca pega más que uno que sí.
+   *
+   * El costo de un imparable es que cubrirse no sirve, no que además pegue más:
+   * si es las dos cosas, el turno en que aparece no tiene respuesta. Se comparan
+   * dentro de su categoría porque un profesor pega distinto que un enemigo de
+   * pasillo. Antes el imparable más fuerte de los enemigos normales era también
+   * el golpe más fuerte del juego temprano — 14 de base, o sea 23 en pantalla
+   * sobre 45 de vida, en el ciclo 1.
+   */
+  const techo = { normal: { imp: 0, bloq: 0 }, profesor: { imp: 0, bloq: 0 } };
+  for (const e of Object.values(ENEMIGOS)) {
+    const t = e.profesor ? techo.profesor : techo.normal;
+    for (const i of e.patron) {
+      if (i.tipo !== "golpe") continue;
+      const d = i.daño ?? 0;
+      if (i.imparable) t.imp = Math.max(t.imp, d);
+      else t.bloq = Math.max(t.bloq, d);
+    }
+  }
+  debe("un imparable no pega más que un bloqueable", techo.normal.imp <= techo.normal.bloq, true);
+  debe(
+    "y tampoco entre profesores",
+    techo.profesor.imp <= techo.profesor.bloq,
+    true,
+  );
+
   for (const f of fallas) console.log(`  FALLA ${f}`);
   if (!fallas.length) console.log(`  OK    puertas y minijuegos (${comprobadas} números exactos)`);
   return fallas.length === 0;

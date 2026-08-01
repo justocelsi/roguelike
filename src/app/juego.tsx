@@ -1904,10 +1904,22 @@ function Combate({
         <Boton
           label="BLOQUEAR"
           icono={ICONOS_ACCION.bloquear}
+          /*
+            Lo que el bloqueo va a hacer *contra lo que viene*, no en abstracto.
+            Sólo se devuelve contra un golpe —no hay nada que redirigir cuando lo
+            que te tiran es un estado— y decirlo recién en el resultado hacía que
+            la mitad de los bloqueos parecieran un contraataque roto.
+          */
           sub={
             <>
-              para todo y devolvés <Golpe state={state} base={bloqueoDe(state).daño} /> ·{" "}
-              {pct(bloqueoDe(state).precision)}%
+              {ciego || losAvisos.some((av) => av.tipo === "golpe") ? (
+                <>
+                  para todo y devolvés <Golpe state={state} base={bloqueoDe(state).daño} />
+                </>
+              ) : (
+                <>para todo, sin devolver</>
+              )}{" "}
+              · {pct(bloqueoDe(state).precision)}%
             </>
           }
           onClick={() => act("bloquear")}

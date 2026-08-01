@@ -141,7 +141,10 @@ function armarLecturas(
 /** Genera un tramo de pasillo con aulas a los costados y el profesor al fondo. */
 export function generarPasillo(
   rng: Rng,
-  opciones: { cantidadPuertas?: number; deformacion?: Record<string, number> } = {},
+  opciones: {
+    cantidadPuertas?: number;
+    deformacion?: Record<string, number>;
+  } = {},
 ): Mundo {
   const cantidadPuertas = opciones.cantidadPuertas ?? 5;
   const deformacion = opciones.deformacion ?? {};
