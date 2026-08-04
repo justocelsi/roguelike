@@ -5,6 +5,7 @@ import { ARMAS, ENEMIGOS, EXPLICACION_EFECTO, ITEMS, MATERIAS } from "@/game/con
 import {
   CICLOS,
   dañoDe,
+  dañoRecibidoDe,
   punteriaArma,
   confundido,
   DAÑO_ATAQUE,
@@ -1617,11 +1618,19 @@ function tapaLaPantalla(e: Entrada | null): boolean {
   return !!e && (!!e.icono || !!e.escudoUsado);
 }
 
-/** El detalle numérico de lo que el enemigo va a intentar. */
-function numerosDe(i: Intencion): string {
+/**
+ * El detalle numérico de lo que el enemigo va a intentar.
+ *
+ * El daño sale del motor, no de una cuenta a mano. Decía `daño × 1,15` —una
+ * constante fósil de cuando `MULT_ENEMIGO` valía otra cosa— mientras el motor
+ * pegaba `daño × 1,80 × escala del ciclo`, y encima ignoraba los defectos que
+ * te hacen recibir más. O sea que el único número sobre el que se apoya la
+ * decisión central del juego venía entre un 36% y un 56% corto.
+ */
+function numerosDe(state: State, i: Intencion): string {
   const prob = `${Math.round((i.precision ?? 0.85) * 100)}% de acertar`;
   if (i.tipo === "golpe") {
-    const base = `golpe de ~${Math.round((i.daño ?? 0) * 1.15)} · ${prob}`;
+    const base = `golpe de ${dañoRecibidoDe(state, i.daño ?? 0)} · ${prob}`;
     return i.imparable ? `${base} · NO SE PUEDE BLOQUEAR` : base;
   }
   if (i.tipo === "cura") {
@@ -2015,7 +2024,7 @@ function Combate({
         <EventoEnLinea
           entrada={actual}
           k={restantes}
-          numeros={ciego ? undefined : numerosDe(intencion)}
+          numeros={ciego ? undefined : numerosDe(state, intencion)}
           ciego={ciego}
         />
       ) : contando ? (
@@ -2044,7 +2053,7 @@ function Combate({
                   {i > 0 && <span className="text-dim">y después: </span>}
                   {av.tell}
                 </p>
-                <p className="text-sm text-dim">{numerosDe(av)}</p>
+                <p className="text-sm text-dim">{numerosDe(state, av)}</p>
               </div>
             ))
           )}

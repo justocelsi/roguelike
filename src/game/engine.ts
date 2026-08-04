@@ -390,6 +390,19 @@ export function dañoDe(state: State, base: number): number {
   return aplicarDaño(state, base);
 }
 
+/**
+ * Y lo que un golpe del enemigo te va a sacar de verdad: con el multiplicador
+ * global, con la escala del ciclo y con lo que te sumen tus defectos.
+ *
+ * Existe por la misma razón que `dañoDe`: el aviso decía `daño × 1,15` a mano
+ * mientras el motor pegaba `daño × 1,80 × escala`, así que el único número
+ * sobre el que se apoya la decisión central del juego —¿pego o me cubro?—
+ * estaba entre un 36% y un 56% por debajo de lo que te iba a entrar.
+ */
+export function dañoRecibidoDe(state: State, base: number): number {
+  return aplicarRecibido(state, base * MULT_ENEMIGO * escalaDaño(state));
+}
+
 function aplicarDaño(state: State, base: number): number {
   let d = (base + (state.combate?.buff ?? 0)) * potencia(state);
   for (const def of defectosActivos(state)) if (def.daño) d = def.daño(d);
