@@ -21,6 +21,15 @@ export type Minijuego = {
   terminado: boolean;
   /** Lo último que pasó, para contárselo al jugador. */
   cuento: string;
+  /**
+   * La tirada que resolvió el último paso, cuando la hubo.
+   *
+   * La apuesta es la única parte del juego afuera del combate donde el jugador
+   * pone algo contra un porcentaje, así que se ve girar en el mismo reloj. Toda
+   * apuesta del juego se ve: un número declarado que se resuelve en silencio es
+   * lo mismo que un número escondido.
+   */
+  tirada?: { prob: number; salio: boolean };
 
   // --- el pizarrón: se te muestra algo y hay que reponerlo ---
   secuencia?: string[];
@@ -134,15 +143,20 @@ export function jugar(j: Minijuego, eleccion: number, rng: Rng): Minijuego {
         premio: j.juntado!,
         terminado: true,
         cuento: `Te vas con ${j.juntado}. No hacía falta más.`,
+        // Irse no es una apuesta: el reloj no tiene nada que resolver.
+        tirada: undefined,
       };
     }
-    if (randInt(rng, 1, 100) <= j.suerte!) {
+    const salio = randInt(rng, 1, 100) <= j.suerte!;
+    const tirada = { prob: j.suerte!, salio };
+    if (salio) {
       return {
         ...j,
         juntado: j.juntado! + 1,
         // Cada paso que sale bien vuelve el siguiente más difícil.
         suerte: Math.max(25, j.suerte! - 15),
         cuento: "Entra otro. Todavía no pasó nada.",
+        tirada,
       };
     }
     return {
@@ -151,6 +165,7 @@ export function jugar(j: Minijuego, eleccion: number, rng: Rng): Minijuego {
       premio: 0,
       terminado: true,
       cuento: "Se cae todo. No te queda nada de lo que juntaste.",
+      tirada,
     };
   }
 

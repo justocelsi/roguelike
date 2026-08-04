@@ -54,7 +54,7 @@ export const VIDA_BASE = 45;
  * mano no le hace gran cosa a esto. El arma es lo que hacés en los turnos en
  * que no te estás cubriendo, y por eso vale la pena entrar a las aulas.
  */
-export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 6);
+export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 8);
 /**
  * Cubrirte justo cuando venía el golpe no sólo lo amortigua: contraatacás.
  * Sin esto, leer bien el aviso te costaba la mitad de tu daño y esperar era
@@ -64,7 +64,7 @@ export const DAÑO_ATAQUE = Number(process.env.NEXT_PUBLIC_PUNO ?? 6);
  * Lo que devuelve un bloqueo: la mitad de un golpe a mano limpia. Nunca puede
  * superar a atacar, o no habría razón para atacar cuando ves venir un golpe.
  */
-export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 5);
+export const DAÑO_CONTRA = Number(process.env.NEXT_PUBLIC_CONTRA ?? 4);
 /**
  * Cuánto del golpe pasa igual cuando bloqueás bien. No es cero a propósito:
  * si bloquear anulara todo, no existiría la opción de correr a matarlo antes
@@ -98,7 +98,7 @@ export const PRECISION_ATAQUE = 0.9;
  * Bloquear no siempre sale. Cuando sale, para el golpe **y** le devolvés:
  * es una sola tirada y un solo resultado, para que se entienda de una.
  */
-export const EFECTIVIDAD_BLOQUEO = Number(process.env.NEXT_PUBLIC_BLOQ ?? 0.9);
+export const EFECTIVIDAD_BLOQUEO = Number(process.env.NEXT_PUBLIC_BLOQ ?? 0.85);
 /** Ningún arma baja de acá por más gastada que esté. */
 const PRECISION_MINIMA = 0.35;
 
@@ -129,8 +129,14 @@ export function punteria(state: State, base: number): number {
  * segunda cuenta se desincronizó dos veces: el reloj declaraba un arco y el
  * resultado salía de otro.
  */
-function conTirada(chance: number, salio: boolean) {
-  return { tirada: { prob: Math.round(chance * 100), salio } };
+function conTirada(chance: number, salio: boolean, critico?: number, fueCritico?: boolean) {
+  return {
+    tirada: {
+      prob: Math.round(chance * 100),
+      salio,
+      ...(critico ? { critico, fueCritico: !!fueCritico } : {}),
+    },
+  };
 }
 
 /** Cuántas armas entran en la mochila. Llenarla obliga a elegir. */
@@ -1320,7 +1326,7 @@ function turnoDeCombate(
               : `${arma.nombre} pasa al lado.`,
             "malo",
             undefined,
-            conTirada(punto, false),
+            conTirada(punto, false, arma.critico),
           ),
         };
       } else {
@@ -1334,7 +1340,7 @@ function turnoDeCombate(
             critico ? `${arma.texto} Justo ahí. ${d}.` : `${arma.texto} ${d}.`,
             "bueno",
             undefined,
-            conTirada(punto, true),
+            conTirada(punto, true, arma.critico, critico),
           ),
         };
         // Recién ahora, y sólo porque entró, puede perderse en el rebote.

@@ -270,7 +270,18 @@ export type Entrada = {
    * efectivamente tocó, así que el azar se ve ocurrir en vez de aparecer ya
    * resuelto en una línea de texto.
    */
-  tirada?: { prob: number; salio: boolean };
+  tirada?: {
+    prob: number;
+    salio: boolean;
+    /**
+     * La chance de crítico **dado que el golpe entra**, que es exactamente cómo
+     * la tira el motor. Con esto el reloj puede partir el arco bueno en dos —lo
+     * normal y lo excepcional— y la aguja cae en el pedazo que tocó de verdad,
+     * porque P(crítico) = prob × critico es la misma cuenta.
+     */
+    critico?: number;
+    fueCritico?: boolean;
+  };
   /**
    * Es el enemigo mostrando qué va a hacer el turno que viene. Se queda más
    * tiempo en pantalla que el resto: es lo único que el jugador necesita leer

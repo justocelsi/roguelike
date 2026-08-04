@@ -23,11 +23,12 @@ aviso, el bot tampoco lo ve. Un bot que hace trampa da números que no sirven.
 
 | Perilla | Valor | Dónde | Qué toca |
 |---|---|---|---|
-| `DAÑO_ATAQUE` | **6** | `engine.ts` | Golpe a mano limpia |
-| `DAÑO_CONTRA` | **5** | `engine.ts` | Lo que devuelve un bloqueo que salió |
-| `EFECTIVIDAD_BLOQUEO` | **0.90** | `engine.ts` | Chance de que el bloqueo funcione |
+| `DAÑO_ATAQUE` | **8** | `engine.ts` | Golpe a mano limpia |
+| `DAÑO_CONTRA` | **4** | `engine.ts` | Lo que devuelve un bloqueo que salió |
+| `EFECTIVIDAD_BLOQUEO` | **0.85** | `engine.ts` | Chance de que el bloqueo funcione |
 | `PASA_BLOQUEANDO` | **0** | `engine.ts` | Un bloqueo que sale no deja pasar nada |
 | `MULT_ENEMIGO` | **1.80** | `engine.ts` | Perilla global del daño enemigo |
+| `TURNOS_RAPIDO` | **3** | `engine.ts` | Terminar en esto o menos paga un item extra |
 | `POR_PROFESOR` | **0.40** | `engine.ts` | Daño extra del jugador por profesor vencido |
 | `PRECISION_ATAQUE` | **0.90** | `engine.ts` | Puntería del golpe a mano limpia |
 | `RESTA_MIEDO` | **0.20** | `engine.ts` | Puntería que te saca el miedo, restando |
@@ -60,18 +61,22 @@ minijuegos.
 
 | Estilo | Muertes | Ciclo |
 |---|---|---|
-| Calculador: decide turno a turno | **43,3%** | 3,6 |
-| Guarda los items para el profesor | 45,3% | 3,5 |
-| Pasivo: bloquea siempre que sirve | 48,8% | 3,4 |
-| Media pasada del pasillo | 57,3% | 3,0 |
-| A lo bruto: el arma que más pegue | 62,8% | 2,6 |
-| Luchador: nunca bloquea | 62,4% | 2,6 |
-| **Derecho al profesor** | **86,0%** | 2,0 |
+| A lo bruto: el arma que más pegue | **55,6%** | 2,9 |
+| Guarda los items para el profesor | 57,3% | 2,9 |
+| Calculador: decide turno a turno | 58,1% | 2,9 |
+| Luchador: nunca bloquea | 58,8% | 2,8 |
+| Media pasada del pasillo | 66,3% | 2,6 |
+| Pasivo: bloquea siempre que sirve | 67,8% | 2,6 |
+| **Derecho al profesor** | **86,6%** | 1,9 |
 
-Los tres estilos que piensan quedan en 43–49 y los dos que nunca se cubren en
-62–63. La brecha se ensanchó al sacarle el pico de daño a los imparables:
-cubrirse pasó a servir en más turnos, así que no cubrirse nunca cuesta más.
-Saltearse el pasillo sigue siendo un error de 23 puntos.
+**13 puntos de banda: la más angosta que tuvo el juego.** Saltearse el pasillo
+sigue siendo un error de 28 puntos, así que la decisión del pasillo aguanta.
+
+Lo que se dio vuelta es cuál estilo gana. Con el puño en 8 y el bloqueo en 85%
+por 4, atacar pasó a rendir más que cubrirse: el pasivo pasó de ser el mejor
+(48,8%) al peor (67,8%), y el calculador dejó de ganarle al que nunca lee el
+aviso. Esa parte es una consecuencia, no un objetivo, y está anotada acá porque
+es lo primero que hay que mirar si el juego empieza a sentirse plano.
 
 ---
 
@@ -663,6 +668,31 @@ Ahora el botón de BLOQUEAR mira el aviso y dice *"para todo y devolvés 5"* o
 *"para todo, sin devolver"* según lo que venga, y el resultado explica por qué:
 *"no hubo golpe que devolver"*. Con el aviso tapado muestra la versión general,
 porque ahí tampoco sabés qué viene.
+
+### El puño a 8, el bloqueo a 85% por 4
+
+Pedido de diseño. `DAÑO_ATAQUE` está marcado arriba como el número más delicado
+del juego, así que lo primero fue medir lo que ese aviso obliga a medir:
+**limpiar el pasillo contra correr al profesor**.
+
+| | Antes (puño 6) | Ahora (puño 8) |
+|---|---|---|
+| Limpia todo | 51,3% | 55,6% |
+| Derecho al profesor | 86,0% | 86,6% |
+| **Brecha** | 35 pts | **28 pts** |
+
+La brecha se achicó pero sigue siendo enorme: el equipo todavía importa y el
+pasillo se sostiene. La banda además quedó en 13 puntos, la más angosta de toda
+la historia del juego.
+
+**El costo está en otro lado.** Bajar la devolución del bloqueo de 5 a 4 y su
+chance de 90% a 85%, mientras el puño sube de 6 a 8, mueve el umbral en el que
+cubrirse conviene de **25 a 29 de daño**. Con los golpes bloqueables yendo de 12
+a 42, eso deja bastante más de la mitad de los turnos del lado de atacar. El
+estilo pasivo pasó de mejor a peor.
+
+Si alguna vez hay que volver: el puño en 6 con el bloqueo en 5/90% devolvía al
+calculador al primer puesto.
 
 ## Cómo volver atrás
 

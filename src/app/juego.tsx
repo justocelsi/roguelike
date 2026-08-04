@@ -1719,12 +1719,24 @@ function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
     vista.current = tirada;
     setUltimo(tirada);
     const arco = (tirada.prob / 100) * 360;
-    // Un margen para que la aguja no quede parada justo sobre el límite: ahí
-    // no se leería de qué lado cayó.
-    const m = Math.min(7, Math.max(arco, 360 - arco) / 6);
-    const destino = tirada.salio
-      ? m + Math.random() * Math.max(1, arco - m * 2)
-      : arco + m + Math.random() * Math.max(1, 360 - arco - m * 2);
+    /*
+     * El arco bueno se parte en dos: lo que entra normal y lo que entra doble.
+     * El pedazo de crítico va al final del arco bueno porque P(crítico) es
+     * P(entra) × P(crítico|entra), que es exactamente cómo lo tira el motor: la
+     * aguja cayendo ahí no es una licencia visual, es la cuenta.
+     */
+    const critico = tirada.critico ? arco * (1 - tirada.critico) : arco;
+    // Un margen para que la aguja no quede parada justo sobre un límite: ahí no
+    // se leería en qué pedazo cayó.
+    const entre = (a: number, b: number) => {
+      const m = Math.min(6, Math.max(1, (b - a) / 4));
+      return a + m + Math.random() * Math.max(0.5, b - a - m * 2);
+    };
+    const destino = !tirada.salio
+      ? entre(arco, 360)
+      : tirada.fueCritico
+        ? entre(critico, arco)
+        : entre(0, critico);
     // Siempre para adelante: vueltas enteras sobre lo ya acumulado. Una aguja
     // que retrocede se lee como un error, no como suspenso.
     const desde = ((acumulado.current % 360) + 360) % 360;
@@ -1746,6 +1758,10 @@ function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
 
   const activo = !!tirada;
   const arco = ultimo ? (ultimo.prob / 100) * 360 : 0;
+  const corteCritico = ultimo?.critico ? arco * (1 - ultimo.critico) : arco;
+  const esfera = ultimo?.critico
+    ? `conic-gradient(var(--agua) 0deg ${corteCritico}deg, var(--oro) ${corteCritico}deg ${arco}deg, var(--malo) ${arco}deg 360deg)`
+    : `conic-gradient(var(--agua) 0deg ${arco}deg, var(--malo) ${arco}deg 360deg)`;
 
   return (
     <div className="flex flex-col items-center gap-1">
@@ -1755,10 +1771,7 @@ function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
         {/* Y encima el arco de la tirada, que entra y sale con un fundido. */}
         <div
           className="absolute inset-0 rounded-full transition-opacity duration-700"
-          style={{
-            background: `conic-gradient(var(--agua) 0deg ${arco}deg, var(--malo) ${arco}deg 360deg)`,
-            opacity: activo ? 1 : 0,
-          }}
+          style={{ background: esfera, opacity: activo ? 1 : 0 }}
         />
         {/* El centro apagado convierte el disco en un anillo. */}
         <div className="absolute inset-[6px] rounded-full bg-background" />
@@ -1788,10 +1801,13 @@ function Reloj({ tirada }: { tirada?: Entrada["tirada"] }) {
       </div>
       <span
         className={`text-xs tabular-nums transition-opacity duration-700 ${
-          activo ? "text-dim opacity-100" : "opacity-0"
+          activo ? "opacity-100" : "opacity-0"
         }`}
       >
-        {ultimo ? `${ultimo.prob}%` : ""}
+        <span className="text-dim">{ultimo ? `${ultimo.prob}%` : ""}</span>
+        {!!ultimo?.critico && (
+          <span className="text-oro"> · {Math.round(ultimo.critico * 100)}</span>
+        )}
       </span>
     </div>
   );
@@ -2251,10 +2267,27 @@ function Juegito({
     return () => clearTimeout(t);
   }, [juego.tipo]);
 
-  const elegir = (i: number) => dispatch({ type: "juego", eleccion: i });
+  /*
+   * Después de apostar, la aguja tiene que llegar a frenar antes de que se
+   * pueda apostar de nuevo — y el resultado escrito espera con ella. Si no, el
+   * reloj giraría al lado de un texto que ya contó cómo terminó.
+   */
+  const [girando, setGirando] = useState(false);
+  useEffect(() => {
+    if (!juego.tirada) return;
+    setGirando(true);
+    const t = setTimeout(() => setGirando(false), RITMO_TIRADA);
+    return () => clearTimeout(t);
+  }, [juego.tirada]);
+
+  const elegir = (i: number) => {
+    if (girando) return;
+    sonar("boton");
+    dispatch({ type: "juego", eleccion: i });
+  };
 
   return (
-    <section className="entra-pantalla flex min-h-0 flex-1 flex-col justify-center gap-6 border border-oro p-6">
+    <section className="entra-pantalla relative flex min-h-0 flex-1 flex-col justify-center gap-6 border border-oro p-6">
       <p className="text-sm tracking-[0.3em] text-oro">
         {juego.tipo === "pizarron"
           ? "EL PIZARRÓN"
@@ -2262,7 +2295,18 @@ function Juegito({
             ? "LA CAJA"
             : "LA HOJA"}
       </p>
-      <p className="text-base leading-relaxed">{juego.cuento}</p>
+      {/* La misma ruleta del combate: toda apuesta del juego se ve girar. */}
+      {juego.tipo === "apuesta" && (
+        <div className="absolute right-4 top-4">
+          <Reloj tirada={girando ? juego.tirada : undefined} />
+        </div>
+      )}
+      <p
+        key={juego.cuento + String(juego.juntado)}
+        className={`text-base leading-relaxed ${juego.tirada ? "espera-la-aguja" : ""}`}
+      >
+        {juego.cuento}
+      </p>
 
       {juego.tipo === "pizarron" && (
         <div className="space-y-5">
@@ -2320,8 +2364,19 @@ function Juegito({
             perder todo lo junto.
           </p>
           <div className="grid grid-cols-2 gap-2">
-            <Boton label="SEGUIR" tono="text-oro" sub={`${juego.suerte}%`} onClick={() => elegir(1)} />
-            <Boton label="ME VOY" sub={`con ${juego.juntado}`} onClick={() => elegir(0)} />
+            <Boton
+              label="SEGUIR"
+              tono="text-oro"
+              sub={`${juego.suerte}%`}
+              disabled={girando}
+              onClick={() => elegir(1)}
+            />
+            <Boton
+              label="ME VOY"
+              sub={`con ${juego.juntado}`}
+              disabled={girando}
+              onClick={() => elegir(0)}
+            />
           </div>
         </div>
       )}

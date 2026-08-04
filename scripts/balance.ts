@@ -651,6 +651,8 @@ function reglas() {
     "un enemigo caído no se mueve más",
     "los porcentajes del combate van de a 5",
     "la ruleta no miente",
+    "el amarillo tampoco miente",
+    "no se pega doble sin haber pegado",
     "cada evento del combate dice cómo quedó el enemigo",
     "el enemigo no revive",
     "cubrirse vale para todo el turno",
@@ -795,6 +797,32 @@ function juegos() {
   const perdido = jugar({ ...apuesta(), juntado: 6, suerte: 0 }, 1, rng);
   debe("perder no deja nada", perdido.premio, 0);
   debe("perder cierra el juego", perdido.terminado, true);
+
+  /*
+   * Y la apuesta declara lo que sale. Es la única apuesta del juego afuera del
+   * combate, gira en el mismo reloj, y por lo tanto le corre la misma regla que
+   * a la ruleta: el arco que muestra tiene que ser el que se tira.
+   */
+  const apostado: Record<number, { n: number; ok: number }> = {};
+  for (let i = 0; i < 4000; i++) {
+    let j = apuesta();
+    while (!j.terminado) {
+      const antes = j.suerte!;
+      j = jugar(j, 1, rng);
+      if (!j.tirada) continue;
+      const c = (apostado[antes] ??= { n: 0, ok: 0 });
+      c.n++;
+      if (j.tirada.salio) c.ok++;
+      if (j.tirada.prob !== antes) {
+        debe("la apuesta declara su propia suerte", j.tirada.prob, antes);
+      }
+    }
+  }
+  const desviadas = Object.entries(apostado)
+    .filter(([, c]) => c.n >= 400 && Math.abs((c.ok / c.n) * 100 - 0) >= 0)
+    .filter(([p, c]) => Math.abs((c.ok / c.n) * 100 - Number(p)) > 5)
+    .map(([p, c]) => `${p}%→${((c.ok / c.n) * 100).toFixed(0)}%`);
+  debe("la apuesta paga lo que promete", desviadas.join(",") || "todas coinciden", "todas coinciden");
 
   // --- el examen -------------------------------------------------------
   // Sólo existe si hay al menos tres sombras sobre las que preguntar.

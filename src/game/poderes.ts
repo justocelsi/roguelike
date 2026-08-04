@@ -67,7 +67,7 @@ PODERES.espejo = {
   id: "espejo",
   nombre: "Espejo",
   texto:
-    "Bloquear te sale un poco menos, pero lo que devolvés deja de ser un empujón. Devolvés 22 en vez de 5, y bloquear baja de 90% a 80%.",
+    "Bloquear te sale un poco menos, pero lo que devolvés deja de ser un empujón. Devolvés 21 en vez de 4, y bloquear baja de 85% a 75%.",
   usos: 0,
   precision: 1,
   efecto: {},
