@@ -21,6 +21,7 @@ import { ICONOS_ITEM } from "../src/game/sprites";
 
 import {
   armasUsables,
+  bloqueoDe,
   initialState,
   MAX_ARMAS,
   PASA_BLOQUEANDO,
@@ -480,6 +481,23 @@ function reglas() {
         }
 
         /*
+         * Si te cubriste, la tirada del bloqueo se ve.
+         *
+         * Se hace apenas empieza el turno del enemigo, antes de saber qué va a
+         * intentar, así que ocurre igual aunque el enemigo espere, aunque su
+         * efecto erre solo, o aunque el escudo se coma el golpe. Una tirada que
+         * ocurre sin mostrarse es azar escondido. La única excepción es un golpe
+         * imparable: ahí no hay tirada porque cubrirse no puede hacer nada.
+         */
+        if (a.accion === "bloquear" && antes.combate) {
+          const en = ENEMIGOS[antes.combate.enemigoId];
+          const i = en.patron[antes.combate.paso % en.patron.length];
+          if (!i.imparable && !nuevas.some((e) => e.tirada)) {
+            fallo("cubrirse siempre muestra su tirada", `«${i.tell}» (${i.tipo})`);
+          }
+        }
+
+        /*
          * Y el estado del combate no se desborda por acumulación: dos anteojos
          * seguidos, tres cafés, un estado aplicado encima de sí mismo.
          */
@@ -625,6 +643,7 @@ function reglas() {
     "se probaron escudos de verdad",
     "fuera del combate no te queda nada encima",
     "el daño que se muestra es el que entra",
+    "cubrirse siempre muestra su tirada",
   ];
   let todo = true;
   for (const r of REGLAS) {
@@ -834,6 +853,34 @@ function juegos() {
     if (cp !== undefined && !deACinco(cp)) sueltos.push(`${id}.contra:${cp}`);
   }
   debe("todo el contenido va de a 5", sueltos.join(",") || "todo redondo", "todo redondo");
+
+  /*
+   * El texto de un poder dice los números que el poder hace.
+   *
+   * El texto es lo único que el jugador tiene para decidir si le conviene, y
+   * es una cadena escrita a mano al lado de los datos: se desincroniza sola.
+   * Ya pasó — Espejo decía «devolvés 20 en vez de 3» cuando en realidad eran
+   * 22 y 5, porque el contraataque base había subido de 3 a 5 y nadie volvió a
+   * leer el texto.
+   */
+  const mudos: string[] = [];
+  const sinPoderes = initialState(1);
+  for (const [id, po] of Object.entries(PODERES)) {
+    const nums = [po.efecto.daño, po.efecto.vida].filter((n): n is number => !!n);
+    for (const n of nums) {
+      if (!new RegExp(`\\b${n}\\b`).test(po.texto)) mudos.push(`${id}:${n}`);
+    }
+    if (po.pasivo?.contraDaño) {
+      const con = bloqueoDe({
+        ...sinPoderes,
+        jugador: { ...sinPoderes.jugador, poderes: [id] },
+      });
+      const base = bloqueoDe(sinPoderes);
+      if (!new RegExp(`\\b${con.daño}\\b`).test(po.texto)) mudos.push(`${id}:devuelve ${con.daño}`);
+      if (!new RegExp(`\\b${base.daño}\\b`).test(po.texto)) mudos.push(`${id}:base ${base.daño}`);
+    }
+  }
+  debe("el texto de un poder dice sus números", mudos.join(",") || "todos coinciden", "todos coinciden");
 
   /*
    * Un golpe que no podés cubrir nunca pega más que uno que sí.

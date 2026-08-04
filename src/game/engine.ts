@@ -488,6 +488,12 @@ function turnoEnemigo(
    * apretás: el reloj gira recién cuando el golpe llega, que es donde está la
    * tensión. Contra un golpe imparable no hay tirada, y no tiene que haber
    * reloj: la pantalla ya dijo que no se puede bloquear.
+   *
+   * **Va en TODAS las salidas del turno**, no sólo en las que te pegan. La
+   * tirada se hace apenas empieza el turno del enemigo, así que si el enemigo
+   * espera, o si su efecto erra solo, o si el escudo se come el golpe, la
+   * tirada igual ocurrió — y una tirada que ocurre sin mostrarse es azar
+   * escondido, que es exactamente lo que este juego no hace.
    */
   const delBloqueo =
     cubierto && !intencion.imparable ? conTirada(cubierto.chance, cubierto.salio) : undefined;
@@ -517,6 +523,7 @@ function turnoEnemigo(
         s = {
           ...s,
           log: logEstado(s, "Lo viste llegar y no te tocó.", "bueno", undefined, {
+            ...delBloqueo,
             escudoUsado: true,
           }),
         };
@@ -588,7 +595,10 @@ function turnoEnemigo(
         ),
       };
     } else if (!acierta) {
-      s = { ...s, log: logEstado(s, "Lo intenta y no te agarra.", "neutral") };
+      s = {
+        ...s,
+        log: logEstado(s, "Lo intenta y no te agarra.", "neutral", undefined, delBloqueo),
+      };
     } else {
       const ef = intencion.efecto;
       const ya = s.efectos.some((x) => x.efecto === ef);
@@ -608,7 +618,10 @@ function turnoEnemigo(
   } else {
     // Un turno de espera igual es un turno: si no se muestra, el jugador ve
     // su acción y después el aviso, y parece que el enemigo se la saltó.
-    s = { ...s, log: logEstado(s, "No hace nada. Todavía.", "neutral") };
+    s = {
+      ...s,
+      log: logEstado(s, "No hace nada. Todavía.", "neutral", undefined, delBloqueo),
+    };
   }
 
   return {
