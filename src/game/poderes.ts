@@ -28,7 +28,7 @@ export const PODERES: Record<string, Poder> = {
   lucidez: {
     id: "lucidez",
     nombre: "Lucidez",
-    texto: "Por un momento ves con claridad. Te saca los estados que tengas encima.",
+    texto: "Por un momento ves con claridad. Te saca todos los estados que tengas encima, no uno.",
     usos: 2,
     precision: 0.95,
     efecto: { limpia: true },
@@ -44,7 +44,7 @@ export const PODERES: Record<string, Poder> = {
   memoria: {
     id: "memoria",
     nombre: "Memoria ajena",
-    texto: "Alguien más se acuerda por vos. 14 de daño y recuperás 8.",
+    texto: "Alguien más se acuerda por vos. 14 de daño, y vos recuperás 8 de vida.",
     usos: 2,
     precision: 0.85,
     efecto: { daño: 14, vida: 8 },
@@ -79,7 +79,7 @@ PODERES.ojera = {
   id: "ojera",
   nombre: "Ojera",
   texto:
-    "De tanto no dormir empezaste a ver un paso más adelante. Ves también lo que va a hacer después.",
+    "De tanto no dormir empezaste a ver un paso más adelante. Además del aviso de este turno, ves el del siguiente.",
   usos: 0,
   precision: 1,
   efecto: {},
@@ -104,7 +104,7 @@ PODERES.segundo_aire = {
   id: "segundo_aire",
   nombre: "Segundo aire",
   texto:
-    "La primera vez que bajás de la mitad en una pelea, recuperás 14. Una sola vez por aula.",
+    "La primera vez que bajás de la mitad en una pelea, recuperás 14. Te levanta aunque el golpe te haya tumbado, una sola vez por aula.",
   usos: 0,
   precision: 1,
   efecto: {},
@@ -121,7 +121,7 @@ export const DEFECTOS: Record<string, Defecto> = {
   piel_fina: {
     id: "piel_fina",
     nombre: "Piel fina",
-    texto: "Todo lo que te hacen duele un tercio más.",
+    texto: "Todo lo que te hacen duele un 35% más.",
     recibido: (base) => Math.round(base * 1.35),
   },
   sueño_corto: {

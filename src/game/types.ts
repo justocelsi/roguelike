@@ -31,10 +31,18 @@ export type Materia = {
 export type Intencion = {
   /** El aviso, un turno antes. Es lo que el jugador tiene que leer. */
   tell: string;
-  tipo: "golpe" | "efecto" | "espera";
+  /**
+   * `cura` es el que rompe la simetría del combate: no se puede cubrir porque
+   * no hay nada que cubrir. Si te tapás mientras se cura, perdiste el turno y
+   * él ganó vida — es el único momento en que quedarse quieto tiene un costo
+   * que se ve.
+   */
+  tipo: "golpe" | "efecto" | "espera" | "cura";
   /** Qué se siente cuando efectivamente pasa. Distinto del aviso. */
   impacto?: string;
   daño?: number;
+  /** Cuánto se recupera a sí mismo. Nunca pasa de su vida inicial. */
+  cura?: number;
   efecto?: Efecto;
   /** 0..1. Nada acierta siempre, tampoco de este lado. */
   precision?: number;
@@ -88,7 +96,18 @@ export type Item = {
   efecto: {
     vida?: number;
     limpia?: boolean;
+    /**
+     * Saca **uno solo** de los estados, el que te queda hace más tiempo.
+     * Limpiarlos todos era demasiado para un item: los tres estados juntos son
+     * la situación más grave del combate y salir de ella no puede costar lo
+     * mismo que salir de una sola.
+     */
+    limpiaUno?: boolean;
     daño?: number;
+    /** Le borra el próximo movimiento: se queda con la mano en el aire. */
+    borra?: boolean;
+    /** Tu próximo golpe no puede fallar. */
+    seguro?: boolean;
     /** Suma a todo lo que hagas por el resto de la pelea. Se acumula. */
     buff?: number;
     /** Absorbe entero el próximo golpe que te entre. */
@@ -160,6 +179,8 @@ export type Combate = {
   /** Pasivos que se disparan una vez por pelea: acá se anota que ya pasó. */
   primerGolpeHecho: boolean;
   redUsada: boolean;
+  /** Turnos que llevás en esta pelea. Se usa para premiar terminarla rápido. */
+  turnos: number;
   /** Lo que aportan los items que duran toda la pelea. */
   buff: number;
   /**
@@ -168,6 +189,10 @@ export type Combate = {
    * único sin que pasara nada y sin decir nada.
    */
   escudo: number;
+  /** Le borraste el próximo movimiento y todavía no lo perdió. */
+  borrado: boolean;
+  /** Tenés un golpe garantizado guardado. */
+  seguro: boolean;
   sangria: { porTurno: number; robo: number } | null;
 };
 
@@ -227,6 +252,8 @@ export type Entrada = {
    * tiene cómo darse cuenta sola de que pasó algo.
    */
   bloqueo?: boolean;
+  /** Y éste es el enemigo curándose: la única vez que su vida puede subir. */
+  cura?: boolean;
   /**
    * Quién lo hizo. La interfaz mete una pausa larga cuando el turno cambia de
    * manos, para que se lea como una secuencia y no como un bloque.

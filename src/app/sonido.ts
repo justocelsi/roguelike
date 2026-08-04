@@ -31,6 +31,7 @@ type Nombre =
   | "hallazgo"
   | "estado"
   | "latido"
+  | "recompone"
   | "boton";
 
 let ctx: AudioContext | null = null;
@@ -221,6 +222,11 @@ export function sonar(que: Nombre) {
     case "estado":
       tono(t, { desde: 420, hasta: 300, dur: 0.5, vol: 0.18, tipo: "sine" });
       tono(t, { desde: 445, hasta: 316, dur: 0.5, vol: 0.14, tipo: "sine" });
+      break;
+    // El enemigo recomponiéndose: lo único que sube del lado de él.
+    case "recompone":
+      tono(t, { desde: 90, hasta: 180, dur: 0.45, vol: 0.2, tipo: "sawtooth" });
+      tono(t, { desde: 135, hasta: 270, dur: 0.45, vol: 0.12, tipo: "sine", retraso: 0.07 });
       break;
     // Dos golpes de corazón. Sólo cuando estás por morir.
     case "latido":

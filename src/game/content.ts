@@ -18,7 +18,7 @@ export const MATERIAS: Record<string, Materia> = {
     efecto: "confusion",
     enemigos: ["teorema", "demostracion", "problema"],
     armas: ["regla", "compas"],
-    items: ["tiza", "cafe"],
+    items: ["tiza", "cafe", "borrador"],
   },
   literatura: {
     id: "literatura",
@@ -34,7 +34,7 @@ export const MATERIAS: Record<string, Materia> = {
     efecto: "miedo",
     enemigos: ["vuelve", "fecha"],
     armas: ["puntero"],
-    items: ["apunte", "caramelo"],
+    items: ["caramelo", "regla_ajena"],
   },
   biologia: {
     id: "biologia",
@@ -164,6 +164,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     patron: [
       { tell: "Se da vuelta adentro del frasco.", tipo: "efecto", efecto: "miedo" , precision: 0.85 },
       { tell: "El vidrio cede un poco.", tipo: "golpe", impacto: "Se derrama sobre vos y está tibio.", daño: 10 , precision: 0.8 },
+      { tell: "Se vuelve a acomodar adentro.", tipo: "cura", cura: 9, impacto: "Se acomoda hasta quedar como estaba. +9." },
     ],
   },
 
@@ -185,6 +186,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     patron: [
       { tell: "El extractor se para.", tipo: "efecto", efecto: "torpeza" , precision: 0.85 },
       { tell: "Se llena.", tipo: "golpe", impacto: "Respirás algo que no era aire.", daño: 11 , precision: 0.8 },
+      { tell: "El extractor vuelve a arrancar.", tipo: "cura", cura: 10, impacto: "Se limpia el aire y vuelve a llenarse. +10." },
     ],
   },
 
@@ -230,6 +232,7 @@ export const ENEMIGOS: Record<string, Enemigo> = {
     profesor: true,
     patron: [
       { tell: "Te pide que te quedes quieto.", tipo: "efecto", efecto: "miedo" , precision: 0.9 },
+      { tell: "Se acomoda los guantes sin apuro.", tipo: "cura", cura: 14, impacto: "Se toma su tiempo. Vuelve a estar entera. +14." },
       { tell: "Señala exactamente el lugar.", tipo: "golpe", impacto: "Apoya el dedo justo donde duele.", daño: 18 , precision: 0.9 },
       { tell: "Espera a que respires.", tipo: "espera" },
       { tell: "Te toma el pulso.", tipo: "efecto", efecto: "torpeza", precision: 0.9 },
@@ -315,10 +318,10 @@ export const ITEMS: Record<string, Item> = {
   apunte: {
     id: "apunte",
     nombre: "el apunte de otro",
-    descripcion: "Letra ajena, pero clara. Te saca los estados que tengas encima.",
+    descripcion: "Letra ajena, pero clara. Te saca uno de los estados que tengas encima.",
     rareza: "raro",
     precision: 0.95,
-    efecto: { limpia: true },
+    efecto: { limpiaUno: true },
   },
   caramelo: {
     id: "caramelo",
@@ -375,6 +378,28 @@ export const ITEMS: Record<string, Item> = {
     rareza: "comun",
     precision: 0.75,
     efecto: { daño: 12 },
+  },
+  /*
+   * Los dos de abajo no curan ni pegan: compran un turno y compran certeza, que
+   * son las dos cosas que el bolsillo no sabía hacer. Los dos premian atacar —
+   * uno te regala el turno para hacerlo, el otro hace que valga la pena tirar el
+   * arma más cara aunque sea la que menos acierta.
+   */
+  borrador: {
+    id: "borrador",
+    nombre: "el borrador del pizarrón",
+    descripcion: "Borrás lo que iba a hacer. Se queda con la mano en el aire un turno.",
+    rareza: "raro",
+    precision: 0.9,
+    efecto: { borra: true },
+  },
+  regla_ajena: {
+    id: "regla_ajena",
+    nombre: "la regla de otro",
+    descripcion: "Medís antes de tirar. Tu próximo golpe no puede fallar.",
+    rareza: "raro",
+    precision: 1,
+    efecto: { seguro: true },
   },
 };
 

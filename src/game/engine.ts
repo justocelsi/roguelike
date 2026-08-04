@@ -137,6 +137,22 @@ function conTirada(chance: number, salio: boolean) {
 export const MAX_ARMAS = 3;
 
 /**
+ * Terminar una pelea en esta cantidad de turnos o menos te deja llevarte algo
+ * de más.
+ *
+ * Es la contracara de cubrirse. Bloquear te mantiene vivo pero no acorta la
+ * pelea, así que sin esto la forma más segura de jugar era también la que no
+ * costaba nada: cubrirse de todo y esperar. Ahora cubrirse de más tiene un
+ * precio que se ve —el que ibas a llevarte y no te llevás— y correr el riesgo
+ * de pegar tiene un premio.
+ *
+ * Tres turnos es la mediana de una pelea pegando siempre. O sea: se alcanza
+ * jugando agresivo y no se alcanza jugando pasivo, que es exactamente la
+ * frontera que queríamos.
+ */
+export const TURNOS_RAPIDO = Number(process.env.NEXT_PUBLIC_RAPIDO ?? 3);
+
+/**
  * Cuánto devuelve y con qué probabilidad sale el bloqueo, ya con los pasivos
  * del sueño aplicados. La interfaz muestra estos números, no los de base.
  */
@@ -303,6 +319,7 @@ function logEstado(
     tirada?: Entrada["tirada"];
     escudoUsado?: boolean;
     bloqueo?: boolean;
+    cura?: boolean;
   },
 ): Entrada[] {
   return [
@@ -456,6 +473,13 @@ const TEXTO_EFECTO: Record<Efecto, string> = {
   torpeza: "El cuerpo te llega tarde.",
 };
 
+/** Y cuando es algo que ya tenías, sólo se dice que va a durar más. */
+const TEXTO_REFRESCO: Record<Efecto, string> = {
+  confusion: "Y sigue sin cerrarte.",
+  miedo: "Y la mano tarda todavía más en volver.",
+  torpeza: "Y el cuerpo se atrasa un poco más.",
+};
+
 /**
  * Un movimiento del enemigo. `cubierto` es el resultado de la tirada del
  * bloqueo, que se hace **una sola vez por turno** afuera de acá.
@@ -497,6 +521,23 @@ function turnoEnemigo(
    */
   const delBloqueo =
     cubierto && !intencion.imparable ? conTirada(cubierto.chance, cubierto.salio) : undefined;
+
+  /*
+   * Si le borraste el movimiento, se queda con la mano en el aire y el patrón
+   * avanza igual: le compraste un turno, no le cambiaste lo que iba a hacer.
+   *
+   * Va después de calcular la tirada del bloqueo, no antes: el borrador no gasta
+   * turno, así que se puede usar y cubrirse en el mismo turno, y esa tirada se
+   * hizo igual.
+   */
+  if (c.borrado) {
+    s = { ...s, combate: { ...c, borrado: false, paso: c.paso + 1 } };
+    s = {
+      ...s,
+      log: logEstado(s, "Se queda con la mano en el aire.", "neutral", undefined, delBloqueo),
+    };
+    return { ...s, log: firmar(s, tope) };
+  }
 
   if (intencion.tipo === "golpe") {
     if (!acierta) {
@@ -610,9 +651,44 @@ function turnoEnemigo(
             )
           : [...s.efectos, { efecto: ef, turnos: duracionEfecto(s) + 1 }],
       };
+      /*
+       * Refrescar algo que ya tenías no se anuncia como si fuera nuevo.
+       *
+       * El cartel a pantalla completa dice "eso te hizo esto", y frenar todo
+       * para avisarte de algo que ya tenías encima no es noticia: es ruido. Y
+       * con torpeza era peor que ruido — veías el cartel de torpeza y acto
+       * seguido el enemigo se movía dos veces, que se lee igual que el bug
+       * viejo de la torpeza cobrándose en el mismo turno en que te agarra. El
+       * motor estaba bien; lo que engañaba era el cartel.
+       */
       s = {
         ...s,
-        log: logEstado(s, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef, ...delBloqueo }),
+        log: ya
+          ? logEstado(s, TEXTO_REFRESCO[ef], "enemigo", undefined, delBloqueo)
+          : logEstado(s, TEXTO_EFECTO[ef], "enemigo", undefined, { icono: ef, ...delBloqueo }),
+      };
+    }
+  } else if (intencion.tipo === "cura") {
+    /*
+     * Se cura. No hay tirada del bloqueo porque no hay nada que bloquear: si te
+     * cubriste este turno, perdiste el turno y encima él ganó vida. Es la única
+     * jugada del juego que castiga quedarse quieto, y por eso existe.
+     */
+    const c2 = s.combate!;
+    const cura = Math.min(intencion.cura ?? 0, c2.vidaMax - c2.vida);
+    if (cura > 0) {
+      s = { ...s, combate: { ...c2, vida: c2.vida + cura } };
+      s = {
+        ...s,
+        log: logEstado(s, intencion.impacto ?? `Se recompone. +${cura}.`, "enemigo", undefined, {
+          ...delBloqueo,
+          cura: true,
+        }),
+      };
+    } else {
+      s = {
+        ...s,
+        log: logEstado(s, "Se recompone, pero ya estaba entero.", "neutral", undefined, delBloqueo),
       };
     }
   } else {
@@ -639,8 +715,14 @@ function turnoEnemigo(
 function redDeSeguridad(s: State): State {
   const red = pasivos(s).red;
   if (!red || !s.combate || s.combate.redUsada) return s;
-  if (s.jugador.vida <= 0 || s.jugador.vida > s.jugador.vidaMax / 2) return s;
-  const vida = Math.min(s.jugador.vidaMax, s.jugador.vida + red);
+  if (s.jugador.vida > s.jugador.vidaMax / 2) return s;
+  /*
+   * Atrapa también cuando el golpe te pasó de largo. Antes salía si la vida ya
+   * estaba en cero o menos, así que la red no agarraba justamente en la única
+   * caída que importa: si el golpe te bajaba de 60% a muerto, no se disparaba
+   * nunca. Una red que no atrapa cuando caés no es una red.
+   */
+  const vida = Math.min(s.jugador.vidaMax, Math.max(1, s.jugador.vida) + red);
   const conRed: State = {
     ...s,
     jugador: { ...s.jugador, vida },
@@ -660,6 +742,11 @@ function cerrarTurno(state: State, rng: Rng): State {
    * nada. Todo lo que te pasa tiene que haber estado avisado.
    */
   const yaTorpe = tieneEfecto(state, "torpeza");
+  // Se cuenta acá y no al apretar el botón: USAR no gasta turno, así que sólo
+  // los turnos que le dan la palabra al enemigo cuentan para el reloj.
+  state = state.combate
+    ? { ...state, combate: { ...state.combate, turnos: state.combate.turnos + 1 } }
+    : state;
 
   /*
    * La tirada del bloqueo se hace acá, una sola vez, y vale para todo lo que el
@@ -767,7 +854,13 @@ function ganarCombate(state: State, rng: Rng): State {
       ...entradas,
     ].slice(0, 30);
 
+  /** ¿Lo terminaste antes de que sonara el timbre? */
+  const aTiempo = c.turnos <= TURNOS_RAPIDO;
+
   let l = caido(state.log, `${enemigo.nombre} deja de estar.`, "bueno");
+  if (aTiempo) {
+    l = caido(l, `Ni te vio venir. Te llevás algo de más.`, "bueno");
+  }
   let armaOfrecida: string | null = null;
   // Lo que sacaste, listado uno por uno. La sombra siempre cae.
   const botin: State["botin"] = [{ tipo: "sombra", id: enemigo.id, cantidad: 1 }];
@@ -797,7 +890,7 @@ function ganarCombate(state: State, rng: Rng): State {
     }
   } else if (jugador.items.length < 6) {
     // Cada materia da siempre lo suyo: por eso se puede aprender qué esperar.
-    const cuantos = random(rng) < 0.25 ? 2 : 1;
+    const cuantos = (random(rng) < 0.25 ? 2 : 1) + (aTiempo ? 1 : 0);
     const candidatos = materia?.items ?? ITEM_IDS;
     const itemId = pickWeighted(
       rng,
@@ -807,6 +900,19 @@ function ganarCombate(state: State, rng: Rng): State {
     jugador = { ...jugador, items: [...jugador.items, ...Array(caben).fill(itemId)] };
     botin.push({ tipo: "item", id: itemId, cantidad: caben });
     l = caido(l, `Guardás ${ITEMS[itemId].nombre}.`, "bueno");
+  }
+
+  /*
+   * Si el botín de la pelea fue un arma, el premio por rapidez va aparte: si no,
+   * ganar rápido una pelea que soltaba arma no pagaría nada.
+   */
+  if (aTiempo && !botin.some((b) => b.tipo === "item") && jugador.items.length < 6) {
+    const extra = premioDe(rng, c.materiaId, 1, true)[0];
+    if (extra) {
+      jugador = { ...jugador, items: [...jugador.items, extra] };
+      botin.push({ tipo: "item", id: extra, cantidad: 1 });
+      l = caido(l, `Guardás ${ITEMS[extra].nombre}.`, "bueno");
+    }
   }
 
   return {
@@ -956,8 +1062,11 @@ function apply(state: State, action: Action, rng: Rng): State {
           poderesUsados: {},
           primerGolpeHecho: false,
           redUsada: false,
+          turnos: 0,
           buff: 0,
           escudo: 0,
+          borrado: false,
+          seguro: false,
           sangria: null,
         },
         // Entrás, y lo primero que pasa es que ves qué va a hacer.
@@ -1129,7 +1238,11 @@ function turnoDeCombate(
 
   switch (accion) {
     case "atacar": {
-      const punto = punteria(s, PRECISION_ATAQUE);
+      // Con la regla de otro guardada, el golpe no puede fallar: la ruleta
+      // muestra 100% y se gasta ahí.
+      const seguro = s.combate!.seguro;
+      if (seguro) s = { ...s, combate: { ...s.combate!, seguro: false } };
+      const punto = seguro ? 1 : punteria(s, PRECISION_ATAQUE);
       if (random(rng) > punto) {
         s = {
           ...s,
@@ -1176,7 +1289,9 @@ function turnoDeCombate(
        * golpe en adelante, así que la chance que se muestra en el reloj es la
        * misma que decía el botón cuando lo apretaste.
        */
-      const punto = punteria(s, precisionArma(s, armaId));
+      const seguro = s.combate!.seguro;
+      if (seguro) s = { ...s, combate: { ...s.combate!, seguro: false } };
+      const punto = seguro ? 1 : punteria(s, precisionArma(s, armaId));
       // El uso se gasta aciertes o no. Y se recupera al salir del aula.
       const acierta = random(rng) <= punto;
       const critico = acierta && random(rng) <= arma.critico;
@@ -1342,6 +1457,19 @@ function turnoDeCombate(
       }
       if (item.efecto.daño) s = dañar(s, aplicarDaño(s, item.efecto.daño));
       if (item.efecto.limpia) s = { ...s, efectos: [] };
+      /*
+       * Uno solo, y el que llevás hace más tiempo: es el que menos te queda por
+       * delante, así que sacártelo es la opción más floja de las tres. Que sea
+       * predecible importa más que que sea la mejor — poder elegir cuál sería
+       * una decisión más, y el bolsillo no gasta turno justamente para no
+       * agregar decisiones al turno.
+       */
+      if (item.efecto.limpiaUno && s.efectos.length) {
+        const menos = s.efectos.reduce((a, b) => (b.turnos < a.turnos ? b : a));
+        s = { ...s, efectos: s.efectos.filter((e) => e !== menos) };
+      }
+      if (item.efecto.borra) s = { ...s, combate: { ...s.combate!, borrado: true } };
+      if (item.efecto.seguro) s = { ...s, combate: { ...s.combate!, seguro: true } };
       if (item.efecto.buff) {
         s = { ...s, combate: { ...s.combate!, buff: s.combate!.buff + item.efecto.buff } };
       }

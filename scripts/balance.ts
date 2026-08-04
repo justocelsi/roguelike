@@ -81,10 +81,15 @@ function proxima(s: State): Intencion | null {
   return p[c.paso % p.length];
 }
 
-/** Bloquear sirve contra todo lo que no sea imparable. */
+/**
+ * Bloquear sirve contra todo lo que no sea imparable — y no sirve contra una
+ * curación, que es justo lo que el aviso dice en pantalla («cubrirte no lo
+ * frena»). Un bot que se tapa mientras el otro se recompone pierde el turno y
+ * encima lo ve recuperar vida, y ningún jugador que lea el aviso haría eso.
+ */
 function convieneBloquear(i: Intencion | null): boolean {
   if (!i) return Math.random() < 0.45;
-  return i.tipo !== "espera" && !i.imparable;
+  return i.tipo !== "espera" && i.tipo !== "cura" && !i.imparable;
 }
 
 /**
@@ -403,7 +408,9 @@ function reglas() {
             fallo("cada evento del combate dice cómo quedó el enemigo", e.texto);
             continue;
           }
-          if (e.vidaEnemigo > previa) fallo("el enemigo no revive", e.texto);
+          // Sube sólo cuando se cura, que es una jugada que anuncia un turno
+          // antes como todas las demás.
+          if (e.vidaEnemigo > previa && !e.cura) fallo("el enemigo no revive", e.texto);
           previa = e.vidaEnemigo;
         }
       }
@@ -457,12 +464,22 @@ function reglas() {
          * el texto: lo que importa no es que coincidan dos strings sino que lo
          * prometido sea lo que pasó.
          */
-        const golpe = nuevas.find((e) => e.texto.startsWith("Le pegás."));
-        if (golpe && antes.combate && s.combate && s.combate.vida > 0) {
-          const bajo = antes.combate.vida - s.combate.vida;
-          const promete = dañoDe(antes, DAÑO_ATAQUE);
-          if (bajo !== promete) {
-            fallo("el daño que se muestra es el que entra", `mostró ${promete}, bajó ${bajo}`);
+        /*
+         * Se compara contra la foto del evento anterior y no contra el final del
+         * turno: desde que hay enemigos que se curan, el neto del turno ya no es
+         * el daño de tu golpe.
+         */
+        const orden = [...nuevas].reverse();
+        const iGolpe = orden.findIndex((e) => e.texto.startsWith("Le pegás."));
+        if (iGolpe !== -1 && antes.combate) {
+          const antesDel = iGolpe === 0 ? antes.combate.vida : orden[iGolpe - 1].vidaEnemigo;
+          const despues = orden[iGolpe].vidaEnemigo;
+          if (antesDel !== undefined && despues !== undefined && despues > 0) {
+            const bajo = antesDel - despues;
+            const promete = dañoDe(antes, DAÑO_ATAQUE);
+            if (bajo !== promete) {
+              fallo("el daño que se muestra es el que entra", `mostró ${promete}, bajó ${bajo}`);
+            }
           }
         }
 
@@ -503,6 +520,8 @@ function reglas() {
          */
         const cb = s.combate;
         if (cb) {
+          // Curarse lo devuelve a lo que era, nunca lo pone por encima.
+          if (cb.vida > cb.vidaMax) fallo("nadie se cura de más", `${cb.vida}/${cb.vidaMax}`);
           if (cb.escudo < 0 || cb.escudo > 6) fallo("el escudo no se desborda", String(cb.escudo));
           if (cb.buff < 0) fallo("el escudo no se desborda", `buff ${cb.buff}`);
         }
@@ -636,6 +655,7 @@ function reglas() {
     "el enemigo no revive",
     "cubrirse vale para todo el turno",
     "el escudo no se desborda",
+    "nadie se cura de más",
     "un estado no se apila consigo mismo",
     "un estado no dura más de lo declarado",
     "el escudo se gasta de a uno",

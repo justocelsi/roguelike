@@ -59,7 +59,7 @@ El kit es lo que sabés que vas a tener; la reserva es lo que decidís si quemá
 ahora o guardás para el profesor. Esa segunda decisión —y no otra— es la que
 sostiene la estrategia larga de la run.
 
-Verificado con 29 invariantes automáticas y 46 comprobaciones de números
+Verificado con 32 invariantes automáticas y 47 comprobaciones de números
 exactos. El banco de pruebas vive en `scripts/balance.ts`.
 
 ## Nada aparece de un frame al otro
@@ -145,9 +145,9 @@ que sabés es una herramienta.
 
 | Materia | Armas | Items |
 |---|---|---|
-| Matemática | la regla, el compás | la tiza, **el café de la sala** |
+| Matemática | la regla, el compás | la tiza, el café, **el borrador** |
 | Literatura | el diccionario | el apunte, **los anteojos de alguien** |
-| Historia | el puntero | el apunte, el caramelo |
+| Historia | el puntero | el caramelo, **la regla de otro** |
 | Biología | el bisturí | la venda, la botella |
 | Química | el mechero, el ácido | el alcohol, la tiza |
 | Ed. Física | la pelota | la botella, el caramelo, **la lata del quiosco** |
@@ -166,6 +166,17 @@ formas distintas, tomadas de NO-SKIN:
   verse gastar.
 - **La lata** te cobra 4 por turno pero te devuelve la mitad de lo que hacés.
   Riesgo puro; premia al que corre a terminar la pelea.
+- **El borrador** le borra el próximo movimiento: se queda con la mano en el
+  aire. No cura ni pega — te compra un turno.
+- **La regla de otro** hace que tu próximo golpe no pueda fallar. Es la única
+  forma de tirar el arma más cara sin pagar su puntería, y el reloj muestra
+  100%.
+
+**El apunte saca un estado, no todos.** Era el item raro más común del juego
+—17,9% de todo lo que aparecía, el único que salía en dos materias— y salir de
+los tres estados a la vez no puede costar lo mismo que salir de uno. Quitarlos
+todos quedó como lo que hace *Lucidez*, que es un poder del sueño: los poderes
+tienen que poder más que los items.
 
 ### Armas
 
@@ -302,6 +313,32 @@ invariante, para las dos categorías por separado.
 > profesor que cierra ese ciclo tiene un remate imparable, así que el primero
 > que verías en tu vida sería el del jefe. Enseñaría que cubrirse siempre sirve
 > para romper esa regla en el peor momento posible.
+
+### Lo que hace que cubrirse no sea siempre la respuesta
+
+Medido: cubrirse de un golpe gana el 98,2% de las peleas contra un profesor y no
+cubrirse nunca gana el 95,1%. Tres puntos. El problema no era que cubrirse fuera
+mejor —tiene que serlo— sino que **era gratis**: bloquear te mantenía vivo y no
+te costaba nada. Dos cosas le pusieron precio.
+
+**Hay enemigos que se recomponen.** Una intención nueva que no se puede cubrir
+porque no hay nada que cubrir: si te tapás mientras se cura, perdés el turno y
+encima lo ves recuperar vida. El aviso lo dice —*«se recompone ~10 · cubrirte no
+lo frena»*— así que es información, no una trampa. Tres enemigos la tienen, uno
+de ellos una profesora.
+
+**Y ganar rápido paga.** Terminar una pelea en **3 turnos o menos** —la mediana
+pegando siempre— te deja llevarte un item de más, y el aula te lo muestra
+mientras peleás: *ANTES DEL TIMBRE · 2 turnos*. Va a la vista y no como sorpresa
+al final; si te enterases recién al ganar sería un premio consuelo, no una
+decisión.
+
+| | Peleas ganadas antes del timbre |
+|---|---|
+| Pegando siempre | **72%** |
+| Cubriéndose cuando conviene | 27% |
+
+Cubrirse sigue siendo más seguro. Ahora también es más pobre.
 
 ### Los tres efectos
 

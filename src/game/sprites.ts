@@ -58,6 +58,10 @@ export const ICONOS_ITEM: Record<string, string[]> = {
   cafe: ["..#.#..", ".......", "######.", "#++++##", "#++++#+", "#++++#.", ".####.."],
   anteojos: [".......", ".......", "##.#.##", "#+#.#+#", "##.#.##", ".......", "......."],
   energizante: [".#####.", ".#+++#.", ".#.#.#.", ".#.#.#.", ".#.#.#.", ".#+++#.", ".#####."],
+  // Un bloque de fieltro con el mango arriba: lo que borra lo que iba a pasar.
+  borrador: [".......", "..###..", ".#####.", "#######", "#+++++#", "#######", "......."],
+  // Una regla con sus marcas.
+  regla_ajena: ["#######", "#+#+#+#", "#######", ".......", "#######", "#+#+#+#", "#######"],
 };
 
 export const SPRITES: Record<string, string[]> = {

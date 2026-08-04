@@ -15,6 +15,7 @@ import {
   veElAviso,
   initialState,
   MAX_ARMAS,
+  TURNOS_RAPIDO,
   nombreDe,
   PRECISION_ATAQUE,
   puedeHuir,
@@ -70,6 +71,7 @@ const CURVA_AGUJA: [number, number, number, number] = [0.1, 0.72, 0.16, 1];
  */
 function sonidoDe(e: Entrada, previo: Entrada | null): Parameters<typeof sonar>[0] | null {
   if (e.escudoUsado) return "escudo";
+  if (e.cura) return "recompone";
   if (e.icono) return "estado";
   if (e.bloqueo) return "bloqueo";
 
@@ -1622,6 +1624,9 @@ function numerosDe(i: Intencion): string {
     const base = `golpe de ~${Math.round((i.daño ?? 0) * 1.15)} · ${prob}`;
     return i.imparable ? `${base} · NO SE PUEDE BLOQUEAR` : base;
   }
+  if (i.tipo === "cura") {
+    return `se recompone ~${i.cura ?? 0} · cubrirte no lo frena`;
+  }
   if (i.tipo === "efecto") {
     const base = `te deja ${(NOMBRE_EFECTO[i.efecto ?? ""] ?? "").toLowerCase()} · ${prob}`;
     return i.imparable ? `${base} · NO SE PUEDE BLOQUEAR` : base;
@@ -1953,6 +1958,22 @@ function Combate({
         <div className="absolute right-3 top-3">
           <Reloj tirada={actual?.tirada} />
         </div>
+
+        {/*
+          Cuántos turnos te quedan para llevarte algo de más.
+          Va a la vista y no como sorpresa al final: si te enterases recién al
+          ganar, no sería una decisión, sería un premio consuelo. Puesto acá, es
+          lo que hace que cubrirte un turno de más se sienta que cuesta algo.
+        */}
+        {c.turnos < TURNOS_RAPIDO && (
+          <div className="absolute left-3 top-3 flex flex-col items-start gap-0.5">
+            <span className="text-xs tracking-[0.3em] text-oro">ANTES DEL TIMBRE</span>
+            <span className="text-sm tabular-nums text-dim">
+              {TURNOS_RAPIDO - c.turnos}{" "}
+              {TURNOS_RAPIDO - c.turnos === 1 ? "turno" : "turnos"}
+            </span>
+          </div>
+        )}
         <div key={`golpe-${golpe}`} className={golpe > 0 ? "sacude" : "respira"}>
           <EnPie materiaId={c.materiaId} />
         </div>
