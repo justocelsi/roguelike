@@ -348,6 +348,25 @@ function reglas() {
       }
       if (s.jugador.vida <= 0 && s.fase !== "muerto") fallo("vida en cero implica muerte");
 
+      /*
+       * La vida máxima sólo se mueve por dos cosas: +6 al vencer un profesor, y
+       * el precio de un defecto en el momento de aceptarlo. Nunca por las dos a
+       * la vez.
+       *
+       * «Sueño corto» se aplicaba en cada profesor sobre el total acumulado, así
+       * que aceptarlo no te sacaba nada y después cada profesor calculaba
+       * (vidaMax + 6) − 8: en vez de ganar 6 perdías 2, cuatro veces. El defecto
+       * cobraba 32 y prometía 8.
+       */
+      const dMax = s.jugador.vidaMax - antes.jugador.vidaMax;
+      if (dMax !== 0) {
+        const gano = antes.fase === "combate" && s.fase === "recompensa" && dMax === 6;
+        const pago = a.type === "aceptar-oferta" && dMax < 0;
+        if (!gano && !pago) {
+          fallo("la vida máxima sólo cambia cuando corresponde", `${dMax} en ${a.type}`);
+        }
+      }
+
       // Nada te agarra sin haber sido anunciado.
       const i0 = antes.log[0] ? s.log.indexOf(antes.log[0]) : s.log.length;
       const nuevas = s.log.slice(0, i0 === -1 ? s.log.length : i0);
@@ -641,6 +660,7 @@ function reglas() {
     "sin repetidas",
     "no se sale sin decidir el arma",
     "vida en cero implica muerte",
+    "la vida máxima sólo cambia cuando corresponde",
     "el miedo sólo actúa si lo tenés",
     "el estado que te agarra queda marcado",
     "botín de su materia",

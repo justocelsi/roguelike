@@ -772,7 +772,15 @@ function Pasillo({
               e.stopPropagation();
               entrarRef.current(cerca);
             }}
-            className="absolute right-3 top-3 rounded-full bg-agua px-5 py-3 text-sm font-bold tracking-widest text-background md:hidden"
+            /*
+              Siempre visible. Estaba con `md:hidden`, así que en cualquier
+              pantalla de 768px para arriba desaparecía — y la única alternativa
+              era la tecla [E]. En una tablet eso significa que no hay ninguna
+              forma de entrar a un aula: te quedás caminando el pasillo para
+              siempre. Un control que existe sólo en una de las dos formas de
+              jugar no es un atajo, es una puerta cerrada.
+            */
+            className="absolute right-3 top-3 rounded-full bg-agua px-5 py-3 text-sm font-bold tracking-widest text-background"
           >
             ENTRAR
           </button>

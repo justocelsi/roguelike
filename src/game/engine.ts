@@ -415,10 +415,16 @@ function aplicarRecibido(state: State, base: number): number {
   return Math.max(1, Math.round(d));
 }
 
-function vidaMaxima(state: State, base: number): number {
-  let v = base;
-  for (const d of defectosActivos(state)) if (d.vidaMax) v = d.vidaMax(v);
-  return v;
+/**
+ * Lo que un defecto le hace a tu vida máxima, **una sola vez, al aceptarlo**.
+ *
+ * Antes se aplicaba en cada profesor vencido, sobre el total acumulado: aceptar
+ * *Sueño corto* no te sacaba nada en el momento, y después cada profesor
+ * calculaba `(vidaMax + 6) − 8`, o sea que en vez de ganar 6 perdías 2. Cuatro
+ * profesores y el defecto te había cobrado 32 en vez de los 8 que promete.
+ */
+function precioEnVida(defecto: Defecto, base: number): number {
+  return defecto.vidaMax ? Math.max(1, defecto.vidaMax(base)) : base;
 }
 
 function nuevoPasillo(state: State, rng: Rng): Mundo {
@@ -886,7 +892,7 @@ function ganarCombate(state: State, rng: Rng): State {
 
   if (enemigo.profesor) {
     // Vencer a un profesor es la única progresión permanente que hay.
-    const nuevaMax = vidaMaxima(state, state.jugador.vidaMax + 6);
+    const nuevaMax = state.jugador.vidaMax + 6;
     jugador = { ...jugador, vidaMax: nuevaMax, vida: nuevaMax };
     botin.push({ tipo: "vida", id: "vidaMax", cantidad: 6 });
     botin.push({ tipo: "potencia", id: "potencia", cantidad: Math.round(POR_PROFESOR * 100) });
@@ -1169,8 +1175,12 @@ function apply(state: State, action: Action, rng: Rng): State {
       if (!par) return state;
       const poder = PODERES[par.poderId];
       const defecto = DEFECTOS[par.defectoId];
+      // El precio se cobra acá y nunca más: es un descuento, no un impuesto.
+      const vidaMax = precioEnVida(defecto, state.jugador.vidaMax);
       const jugador: Jugador = {
         ...state.jugador,
+        vidaMax,
+        vida: Math.min(state.jugador.vida, vidaMax),
         poderes: [...state.jugador.poderes, poder.id],
         defectos: [...state.jugador.defectos, defecto.id],
       };
